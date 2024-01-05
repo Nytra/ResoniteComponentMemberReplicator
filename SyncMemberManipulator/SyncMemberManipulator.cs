@@ -31,31 +31,37 @@ namespace SyncMemberManipulator
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_InitialFlexibleHeight = new ModConfigurationKey<float>("Key_InitialFlexibleHeight", "Key_InitialFlexibleHeight", () => -1f);
 
-		// fields
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<dummy> Key_Dummy1 = new ModConfigurationKey<dummy>("Key_Dummy1", "<size=0></size>", () => new dummy());
+
+        // fields
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_FieldsMinWidth = new ModConfigurationKey<float>("Key_FieldsMinWidth", "Key_FieldsMinWidth", () => -1f);
         [AutoRegisterConfigKey]
-        static ModConfigurationKey<float> Key_FieldsMinHeight = new ModConfigurationKey<float>("Key_FieldsMinHeight", "Key_FieldsMinHeight", () => -1f);
+        static ModConfigurationKey<float> Key_FieldsMinHeight = new ModConfigurationKey<float>("Key_FieldsMinHeight", "Key_FieldsMinHeight", () => 24f);
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_FieldsPreferredWidth = new ModConfigurationKey<float>("Key_FieldsPreferredWidth", "Key_FieldsPreferredWidth", () => -1f);
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_FieldsPreferredHeight = new ModConfigurationKey<float>("Key_FieldsPreferredHeight", "Key_FieldsPreferredHeight", () => -1f);
         [AutoRegisterConfigKey]
-        static ModConfigurationKey<float> Key_FieldsFlexibleWidth = new ModConfigurationKey<float>("Key_FieldsFlexibleWidth", "Key_FieldsFlexibleWidth", () => -1f);
+        static ModConfigurationKey<float> Key_FieldsFlexibleWidth = new ModConfigurationKey<float>("Key_FieldsFlexibleWidth", "Key_FieldsFlexibleWidth", () => 1000f);
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_FieldsFlexibleHeight = new ModConfigurationKey<float>("Key_FieldsFlexibleHeight", "Key_FieldsFlexibleHeight", () => -1f);
 
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<dummy> Key_Dummy2 = new ModConfigurationKey<dummy>("Key_Dummy2", "<size=0></size>", () => new dummy());
+
         // checkbox
         [AutoRegisterConfigKey]
-        static ModConfigurationKey<float> Key_CheckboxMinWidth = new ModConfigurationKey<float>("Key_CheckboxMinWidth", "Key_CheckboxMinWidth", () => 48f);
+        static ModConfigurationKey<float> Key_CheckboxMinWidth = new ModConfigurationKey<float>("Key_CheckboxMinWidth", "Key_CheckboxMinWidth", () => 24f);
         [AutoRegisterConfigKey]
-        static ModConfigurationKey<float> Key_CheckboxMinHeight = new ModConfigurationKey<float>("Key_CheckboxMinHeight", "Key_CheckboxMinHeight", () => -1f);
+        static ModConfigurationKey<float> Key_CheckboxMinHeight = new ModConfigurationKey<float>("Key_CheckboxMinHeight", "Key_CheckboxMinHeight", () => 24f);
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_CheckboxPreferredWidth = new ModConfigurationKey<float>("Key_CheckboxPreferredWidth", "Key_CheckboxPreferredWidth", () => 48f);
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_CheckboxPreferredHeight = new ModConfigurationKey<float>("Key_CheckboxPreferredHeight", "Key_CheckboxPreferredHeight", () => -1f);
         [AutoRegisterConfigKey]
-        static ModConfigurationKey<float> Key_CheckboxFlexibleWidth = new ModConfigurationKey<float>("Key_CheckboxFlexibleWidth", "Key_CheckboxFlexibleWidth", () => -1f);
+        static ModConfigurationKey<float> Key_CheckboxFlexibleWidth = new ModConfigurationKey<float>("Key_CheckboxFlexibleWidth", "Key_CheckboxFlexibleWidth", () => 1f);
         [AutoRegisterConfigKey]
         static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
 
@@ -88,7 +94,6 @@ namespace SyncMemberManipulator
 			Slot WizardSearchDataSlot;
 			Slot WizardGeneratedFieldsDataSlot;
 			UIBuilder WizardUI;
-			//UIBuilder GeneratedFieldsUI;
 
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> searchComponent;
@@ -111,7 +116,7 @@ namespace SyncMemberManipulator
 				WizardSearchDataSlot = WizardSlot.AddSlot("SearchData");
 				WizardGeneratedFieldsDataSlot = WizardSlot.AddSlot("FieldsData");
 
-				WizardUI = RadiantUI_Panel.SetupPanel(WizardSlot, WIZARD_TITLE.AsLocaleKey(), new float2(800f, 1500f));
+				WizardUI = RadiantUI_Panel.SetupPanel(WizardSlot, WIZARD_TITLE.AsLocaleKey(), new float2(800, 800));
 				RadiantUI_Constants.SetupEditorStyle(WizardUI);
 
 				WizardUI.Canvas.MarkDeveloper();
@@ -138,6 +143,18 @@ namespace SyncMemberManipulator
                 {
                     fieldsStruct.enabledField.Value = val;
                 }
+            }
+
+			void UpdateCanvasSize()
+			{
+				WizardSlot.RunInUpdates(3, () => 
+				{
+					// hardcoded magic numbers oof
+					// supposed to be the size of the canvas that is actually used
+					// 24 is preferred height of the default elements. There are 4. 5? 24*4. 80 is height on panel header. 12 is extra to make it look nice?
+					float newY = WizardGeneratedFieldsRect.LocalComputeRect.size.y + 24 * 4 + 80;// + 12;
+                    WizardUI.Canvas.Size.Value = new float2(800, newY);
+                });
             }
 
 			void RegenerateWizardUI()
@@ -172,7 +189,9 @@ namespace SyncMemberManipulator
                 VerticalLayout verticalLayout2 = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
                 verticalLayout2.ForceExpandHeight.Value = false;
 
-				WizardUI.PopStyle();
+                WizardUI.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
+
+                WizardUI.PopStyle();
 
                 WizardGeneratedFieldsSlot = WizardUI.Root;
 				WizardGeneratedFieldsRect = WizardUI.CurrentRect;
@@ -186,8 +205,6 @@ namespace SyncMemberManipulator
 					//WizardGeneratedFieldsSlot.RemoveAllComponents((Component c) => c != WizardGeneratedFieldsRect);
 					if (((ISyncRef)reference).Target != null)
 					{
-						//WizardUI.PushStyle(new UIStyle());
-						//AccessTools.Field(typeof(UIBuilder), "_uiStyles")
                         WizardUI.Text("Component Fields");
                         WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
                         WizardUI.Spacer(24f);
@@ -219,8 +236,11 @@ namespace SyncMemberManipulator
 						{
 							Apply();
 						};
+						WizardUI.Spacer(24f);
 					}
-				};
+					UpdateCanvasSize();
+                };
+				UpdateCanvasSize();
 			}
 
 			private void Apply()
@@ -260,7 +280,7 @@ namespace SyncMemberManipulator
 					{
 						UI.PushStyle();
 						UI.Style.PreferredHeight = 24f;
-						UI.Text($"<color=gray>{syncMember.Name} (not supported)</color>");
+						UI.Text($"<color=gray>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (not supported)</color>");
 						UI.PopStyle();
 						continue;
 					};
@@ -309,7 +329,7 @@ namespace SyncMemberManipulator
 						Error(e.ToString());
                         UI.PushStyle();
                         UI.Style.PreferredHeight = 24f;
-                        UI.Text($"<color=red>{syncMember.Name} (threw exception)</color>");
+                        UI.Text($"<color=red>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (threw exception)</color>");
 						UI.PopStyle();
 						continue;
 					}
@@ -319,21 +339,12 @@ namespace SyncMemberManipulator
 					{
                         UI.PushStyle();
                         UI.Style.PreferredHeight = 24f;
-                        UI.Text($"<color=sub.purple>{syncMember.Name} (should be supported?)</color>");
+                        UI.Text($"<color=sub.purple>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (should be supported?)</color>");
 						UI.PopStyle();
                         continue;
                     };
 
 					Slot s = WizardGeneratedFieldsDataSlot.FindChildOrAdd(i.ToString() + "_" + syncMember.Name);
-
-                    //UI.Style.PreferredWidth = 96f;
-                    //UI.Style.MinWidth = 400f;
-                    
-					
-
-                    //UI.Style.FlexibleWidth = -1f;
-					//UI.Style.FlexibleHeight = -1f;
-					//UI.Style.MinHeight = -1;
 
                     UI.HorizontalLayout(4f, childAlignment: Alignment.MiddleLeft).ForceExpandWidth.Value = false;
 
@@ -346,17 +357,9 @@ namespace SyncMemberManipulator
                     WizardUI.Style.FlexibleWidth = config.GetValue(Key_CheckboxFlexibleWidth);
                     WizardUI.Style.FlexibleHeight = config.GetValue(Key_CheckboxFlexibleHeight);
 
-                    //UI.Style.FlexibleWidth = -1;
-                    //UI.Style.PreferredWidth = 48f;
-                    //UI.Style.MinWidth = 48f;
-
                     var checkbox = UI.Checkbox(false);
 
                     UI.PopStyle();
-
-                    //UI.Style.PreferredWidth = 400f;
-                    //UI.Style.MinWidth = 724f;
-                    //UI.Style.FlexibleWidth = 400f;
 
                     Component c = s.GetComponent(t);
 					bool subscribe = false;
