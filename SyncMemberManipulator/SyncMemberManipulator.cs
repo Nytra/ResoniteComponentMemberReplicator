@@ -5,10 +5,8 @@ using FrooxEngine.UIX;
 using Elements.Core;
 using System;
 using System.Reflection;
-using HarmonyLib;
 using FrooxEngine.Undo;
-using System.Threading.Tasks;
-using Elements.Assets;
+using HarmonyLib;
 
 namespace SyncMemberManipulator
 {
@@ -19,10 +17,55 @@ namespace SyncMemberManipulator
 		public override string Version => "1.0.0";
 		public override string Link => "https://github.com/Nytra/ResoniteSyncMemberManipulator";
 
-		const string WIZARD_TITLE = "Component Field Manipulator (Mod)";
+		// initial
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_InitialMinWidth = new ModConfigurationKey<float>("Key_InitialMinWidth", "Key_InitialMinWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_InitialMinHeight = new ModConfigurationKey<float>("Key_InitialMinHeight", "Key_InitialMinHeight", () => 24f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_InitialPreferredWidth = new ModConfigurationKey<float>("Key_InitialPreferredWidth", "Key_InitialPreferredWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_InitialPreferredHeight = new ModConfigurationKey<float>("Key_InitialPreferredHeight", "Key_InitialPreferredHeight", () => 24f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_InitialFlexibleWidth = new ModConfigurationKey<float>("Key_InitialFlexibleWidth", "Key_InitialFlexibleWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_InitialFlexibleHeight = new ModConfigurationKey<float>("Key_InitialFlexibleHeight", "Key_InitialFlexibleHeight", () => -1f);
+
+		// fields
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_FieldsMinWidth = new ModConfigurationKey<float>("Key_FieldsMinWidth", "Key_FieldsMinWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_FieldsMinHeight = new ModConfigurationKey<float>("Key_FieldsMinHeight", "Key_FieldsMinHeight", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_FieldsPreferredWidth = new ModConfigurationKey<float>("Key_FieldsPreferredWidth", "Key_FieldsPreferredWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_FieldsPreferredHeight = new ModConfigurationKey<float>("Key_FieldsPreferredHeight", "Key_FieldsPreferredHeight", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_FieldsFlexibleWidth = new ModConfigurationKey<float>("Key_FieldsFlexibleWidth", "Key_FieldsFlexibleWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_FieldsFlexibleHeight = new ModConfigurationKey<float>("Key_FieldsFlexibleHeight", "Key_FieldsFlexibleHeight", () => -1f);
+
+        // checkbox
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_CheckboxMinWidth = new ModConfigurationKey<float>("Key_CheckboxMinWidth", "Key_CheckboxMinWidth", () => 48f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_CheckboxMinHeight = new ModConfigurationKey<float>("Key_CheckboxMinHeight", "Key_CheckboxMinHeight", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_CheckboxPreferredWidth = new ModConfigurationKey<float>("Key_CheckboxPreferredWidth", "Key_CheckboxPreferredWidth", () => 48f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_CheckboxPreferredHeight = new ModConfigurationKey<float>("Key_CheckboxPreferredHeight", "Key_CheckboxPreferredHeight", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_CheckboxFlexibleWidth = new ModConfigurationKey<float>("Key_CheckboxFlexibleWidth", "Key_CheckboxFlexibleWidth", () => -1f);
+        [AutoRegisterConfigKey]
+        static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
+
+        static ModConfiguration config;
+
+        const string WIZARD_TITLE = "Component Field Manipulator (Mod)";
 
 		public override void OnEngineInit()
 		{
+			config = GetConfiguration();
 			Engine.Current.RunPostInit(AddMenuOption);
 		}
 		void AddMenuOption()
@@ -37,10 +80,6 @@ namespace SyncMemberManipulator
 				return new SyncMemberManipulator(x);
 			}
 
-			//private static FieldInfo rootsField = AccessTools.Field(typeof(UIBuilder), "roots");
-			//private static FieldInfo uiStylesField = AccessTools.Field(typeof(UIBuilder), "_uiStyles");
-			//private static FieldInfo currentField = AccessTools.Field(typeof(UIBuilder), "Current");
-
 			Slot WizardSlot;
 			Slot WizardContentSlot;
 			Slot WizardGeneratedFieldsSlot;
@@ -49,6 +88,7 @@ namespace SyncMemberManipulator
 			Slot WizardSearchDataSlot;
 			Slot WizardGeneratedFieldsDataSlot;
 			UIBuilder WizardUI;
+			//UIBuilder GeneratedFieldsUI;
 
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> searchComponent;
@@ -77,17 +117,17 @@ namespace SyncMemberManipulator
 				WizardUI.Canvas.MarkDeveloper();
 				WizardUI.Canvas.AcceptPhysicalTouch.Value = false;
 
-				WizardUI.Style.MinHeight = 24f;
-				WizardUI.Style.PreferredHeight = 24f;
-				WizardUI.Style.PreferredWidth = 96f;
-				WizardUI.Style.MinWidth = 400f;
+				WizardUI.Style.MinWidth = config.GetValue(Key_InitialMinWidth);
+                WizardUI.Style.MinHeight = config.GetValue(Key_InitialMinHeight);
+                WizardUI.Style.PreferredWidth = config.GetValue(Key_InitialPreferredWidth);
+                WizardUI.Style.PreferredHeight = config.GetValue(Key_InitialPreferredHeight);
+                WizardUI.Style.FlexibleWidth = config.GetValue(Key_InitialFlexibleWidth);
+                WizardUI.Style.FlexibleHeight = config.GetValue(Key_InitialFlexibleHeight);
 
-				WizardSlot.PositionInFrontOfUser(float3.Backward, distance: 1f);
+                WizardSlot.PositionInFrontOfUser(float3.Backward, distance: 1f);
 
 				WizardContentSlot = WizardUI.Root;
 				WizardContentRect = WizardUI.CurrentRect;
-
-				//WizardStyle = WizardUI.Style.Clone();
 
 				RegenerateWizardUI();
 			}
@@ -120,25 +160,38 @@ namespace SyncMemberManipulator
 
 				WizardUI.Spacer(24f);
 
-				VerticalLayout verticalLayout2 = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
-				verticalLayout2.ForceExpandHeight.Value = false;
+				WizardUI.PushStyle();
 
-				WizardGeneratedFieldsSlot = WizardUI.Root;
+                WizardUI.Style.MinWidth = -1f;
+                WizardUI.Style.MinHeight = -1f;
+                WizardUI.Style.PreferredWidth = -1f;
+                WizardUI.Style.PreferredHeight = -1f;
+                WizardUI.Style.FlexibleWidth = -1f;
+                WizardUI.Style.FlexibleHeight = -1f;
+
+                VerticalLayout verticalLayout2 = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
+                verticalLayout2.ForceExpandHeight.Value = false;
+
+				WizardUI.PopStyle();
+
+                WizardGeneratedFieldsSlot = WizardUI.Root;
 				WizardGeneratedFieldsRect = WizardUI.CurrentRect;
 
 				searchComponent.Reference.Changed += (reference) => 
 				{
 					WizardGeneratedFieldsDataSlot.DestroyChildren();
 					WizardGeneratedFieldsSlot.DestroyChildren();
-					//WizardUI.ForceNext = WizardGeneratedFieldsRect;
-					WizardUI.NestInto(WizardGeneratedFieldsRect);
+                    //WizardUI.ForceNext = WizardGeneratedFieldsRect;
+                    WizardUI.NestInto(WizardGeneratedFieldsRect);
 					//WizardGeneratedFieldsSlot.RemoveAllComponents((Component c) => c != WizardGeneratedFieldsRect);
 					if (((ISyncRef)reference).Target != null)
 					{
-						WizardUI.Text("Component Fields");
-						WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
-						WizardUI.Spacer(24f);
-						WizardUI.Button("Select All").LocalPressed += (btn, data) => 
+						//WizardUI.PushStyle(new UIStyle());
+						//AccessTools.Field(typeof(UIBuilder), "_uiStyles")
+                        WizardUI.Text("Component Fields");
+                        WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
+                        WizardUI.Spacer(24f);
+                        WizardUI.Button("Select All").LocalPressed += (btn, data) => 
 						{
 							SetEnabledFields(true);
 						};
@@ -147,54 +200,27 @@ namespace SyncMemberManipulator
                             SetEnabledFields(false);
                         };
                         WizardUI.Spacer(24f);
+
+                        WizardUI.PushStyle();
+
+                        WizardUI.Style.MinWidth = config.GetValue(Key_FieldsMinWidth);
+                        WizardUI.Style.MinHeight = config.GetValue(Key_FieldsMinHeight);
+                        WizardUI.Style.PreferredWidth = config.GetValue(Key_FieldsPreferredWidth);
+                        WizardUI.Style.PreferredHeight = config.GetValue(Key_FieldsPreferredHeight);
+                        WizardUI.Style.FlexibleWidth = config.GetValue(Key_FieldsFlexibleWidth);
+                        WizardUI.Style.FlexibleHeight = config.GetValue(Key_FieldsFlexibleHeight);
+
                         GenerateComponentMemberEditors(WizardUI, searchComponent.Reference.Target);
-						WizardUI.Spacer(24f);
-						WizardUI.Button("Apply to Hierarchy").LocalPressed += (btn, data) => 
+
+                        WizardUI.PopStyle();
+
+                        WizardUI.Spacer(24f);
+                        WizardUI.Button("Apply to Hierarchy (Undoable)").LocalPressed += (btn, data) => 
 						{
 							Apply();
 						};
 					}
 				};
-
-				//if (!ValidateCurrentBuilder())
-				//{
-				//// build initial screen
-
-				////WizardUI.PushStyle();
-
-				//panelName = WizardDataSlot.FindChildOrAdd("Panel Name").GetComponentOrAttach<ValueField<string>>();
-				//panelName.Value.Value = "Test UIX Panel";
-				//panelSize = WizardDataSlot.FindChildOrAdd("Panel Size").GetComponentOrAttach<ValueField<float2>>();
-				//panelSize.Value.Value = new float2(800f, 800f);
-
-				//VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
-				//verticalLayout.ForceExpandHeight.Value = false;
-
-				//SyncMemberEditorBuilder.Build(panelName.Value, "Panel Name", null, WizardUI);
-				//SyncMemberEditorBuilder.Build(panelSize.Value, "Panel Size", null, WizardUI);
-
-				////GenerateStyleMemberEditors(WizardUI, WizardUI.Style);
-
-				//WizardUI.Spacer(24f);
-
-				//createPanelButton = WizardUI.Button("Create Panel");
-				//createPanelButton.LocalPressed += (btn, data) =>
-				//{
-				//    Slot root = WizardSlot.LocalUserSpace.AddSlot(panelName.Value.Value);
-				//    currentBuilder = CreatePanel(root, root.Name, panelSize.Value.Value);
-				//    currentBuilder.Root.OnPrepareDestroy += (slot) =>
-				//    {
-				//        // Run an empty action after the slot gets destroyed simply to update the wizard UI
-				//        WizardSlot.RunSynchronously(() =>
-				//        {
-				//            WizardAction(null, new ButtonEventData(), () => { });
-				//        });
-				//    };
-				//    CopyStyle(WizardUI, currentBuilder);
-				//    //WizardUI.PopStyle();
-				//    RegenerateWizardUI();
-				//};
-				//}
 			}
 
 			private void Apply()
@@ -220,73 +246,6 @@ namespace SyncMemberManipulator
 				WizardSlot.World.EndUndoBatch();
 			}
 
-			//void UpdateTexts()
-			//{
-			//    var roots = (Stack<Slot>)rootsField.GetValue(currentBuilder);
-			//    var uiStyles = (Stack<UIStyle>)uiStylesField.GetValue(currentBuilder);
-
-			//    rootText.Content.Value = $"[{roots.Count}] Root: ";
-			//    if (IsSlotValid(currentBuilder.Root))
-			//    {
-			//        rootText.Content.Value += currentBuilder.Root.Name;
-			//    }
-			//    else
-			//    {
-			//        rootText.Content.Value += "Null";
-			//    }
-			//    currentText.Content.Value = "Current: ";
-			//    if (IsSlotValid(currentBuilder.Current))
-			//    {
-			//        currentText.Content.Value += currentBuilder.Current.Name;
-			//    }
-			//    else
-			//    {
-			//        currentText.Content.Value += "Null";
-			//    }
-			//    //styleText.Content.Value = "Styles count: " + uiStyles.Count;
-			//}
-
-			//bool IsSlotValid(Slot s)
-			//{
-			//	if (s == null || s.IsRemoved)
-			//	{
-			//		return false;
-			//	}
-			//	return true;
-			//}
-
-			//bool ValidateCurrentBuilder()
-			//{
-			//    if (currentBuilder == null ||
-			//        currentBuilder.Canvas == null ||
-			//        !IsSlotValid(currentBuilder.Canvas.Slot) ||
-			//        (!IsSlotValid(currentBuilder.Root) && !IsSlotValid(currentBuilder.Current)))
-			//    {
-			//        return false;
-			//    }
-			//    return true;
-			//}
-
-			//UIBuilder CreatePanel(Slot root, string name, float2 size)
-			//{
-			//	UIBuilder builder = RadiantUI_Panel.SetupPanel(root, name.AsLocaleKey(), size);
-			//	RadiantUI_Constants.SetupEditorStyle(builder);
-			//	root.LocalScale *= 0.0005f;
-			//	root.PositionInFrontOfUser(float3.Backward, distance: 1f);
-			//	return builder;
-			//}
-
-			//void CopyStyle(UIBuilder b1, UIBuilder b2)
-			//{
-			//    FieldInfo[] fields = typeof(UIStyle).GetFields();
-			//    int i = 0;
-			//    foreach (FieldInfo field in fields)
-			//    {
-			//        field.SetValue(b2.Style, field.GetValue(b1.Style));
-			//        i++;
-			//    }
-			//}
-
 			void GenerateComponentMemberEditors(UIBuilder UI, Component targetComponent)
 			{
 				syncMemberNameFields.Clear();
@@ -297,7 +256,14 @@ namespace SyncMemberManipulator
 					i += 1;
 
 					// This will only work for fields, not things like lists or bags
-					if (!(syncMember is IField)) continue;
+					if (!(syncMember is IField)) 
+					{
+						UI.PushStyle();
+						UI.Style.PreferredHeight = 24f;
+						UI.Text($"<color=gray>{syncMember.Name} (not supported)</color>");
+						UI.PopStyle();
+						continue;
+					};
 
 					Type genericTypeDefinition = null;
 					if (syncMember.GetType().IsGenericType)
@@ -310,48 +276,87 @@ namespace SyncMemberManipulator
 					Type t = null;
 					string memberName = null;
 
-					if (genericTypeDefinition == typeof(Sync<>))
+					try
 					{
-						t = typeof(ValueField<>).MakeGenericType(((IField)syncMember).ValueType);
-						memberName = "Value";
-					}
-					else if (genericTypeDefinition == typeof(SyncRef<>))
+                        if (genericTypeDefinition == typeof(Sync<>))
+                        {
+                            t = typeof(ValueField<>).MakeGenericType(((IField)syncMember).ValueType);
+                            memberName = "Value";
+                        }
+                        else if (genericTypeDefinition == typeof(AssetRef<>))
+                        {
+                            t = typeof(AssetLoader<>).MakeGenericType(syncMember.GetType().GetGenericArguments()[0]);
+                            memberName = "Asset";
+                        }
+                        else if (syncMember is SyncType)
+                        {
+                            t = typeof(TypeField);
+                            memberName = "Type";
+                        }
+                        else if (genericTypeDefinition == typeof(SyncDelegate<>))
+                        {
+                            t = typeof(DelegateTag<>).MakeGenericType(((ISyncRef)syncMember).TargetType);
+                            memberName = "Delegate";
+                        }
+                        else if (syncMember is ISyncRef)
+                        {
+                            t = typeof(ReferenceField<>).MakeGenericType(((ISyncRef)syncMember).TargetType);
+                            memberName = "Reference";
+                        }
+                    }
+					catch (Exception e)
 					{
-						t = typeof(ReferenceField<>).MakeGenericType(((ISyncRef)syncMember).TargetType);
-						memberName = "Reference";
+						Error(e.ToString());
+                        UI.PushStyle();
+                        UI.Style.PreferredHeight = 24f;
+                        UI.Text($"<color=red>{syncMember.Name} (threw exception)</color>");
+						UI.PopStyle();
+						continue;
 					}
-					else if (genericTypeDefinition == typeof(SyncDelegate<>))
-					{
-						t = typeof(DelegateTag<>).MakeGenericType(((ISyncRef)syncMember).TargetType);
-						memberName = "Delegate";
-					}
-					else if (syncMember is SyncType)
-					{
-						t = typeof(TypeField);
-						memberName = "Type";
-					}
+					
 
-					if (t == null || memberName == null) continue;
+					if (t == null || memberName == null)
+					{
+                        UI.PushStyle();
+                        UI.Style.PreferredHeight = 24f;
+                        UI.Text($"<color=sub.purple>{syncMember.Name} (should be supported?)</color>");
+						UI.PopStyle();
+                        continue;
+                    };
 
 					Slot s = WizardGeneratedFieldsDataSlot.FindChildOrAdd(i.ToString() + "_" + syncMember.Name);
 
                     //UI.Style.PreferredWidth = 96f;
                     //UI.Style.MinWidth = 400f;
                     
-					UI.PushStyle();
+					
 
-                    UI.Style.FlexibleWidth = -1f;
+                    //UI.Style.FlexibleWidth = -1f;
+					//UI.Style.FlexibleHeight = -1f;
+					//UI.Style.MinHeight = -1;
 
                     UI.HorizontalLayout(4f, childAlignment: Alignment.MiddleLeft).ForceExpandWidth.Value = false;
 
+                    UI.PushStyle();
+
+                    WizardUI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
+                    WizardUI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
+                    WizardUI.Style.PreferredWidth = config.GetValue(Key_CheckboxPreferredWidth);
+                    WizardUI.Style.PreferredHeight = config.GetValue(Key_CheckboxPreferredHeight);
+                    WizardUI.Style.FlexibleWidth = config.GetValue(Key_CheckboxFlexibleWidth);
+                    WizardUI.Style.FlexibleHeight = config.GetValue(Key_CheckboxFlexibleHeight);
+
+                    //UI.Style.FlexibleWidth = -1;
                     //UI.Style.PreferredWidth = 48f;
                     //UI.Style.MinWidth = 48f;
 
                     var checkbox = UI.Checkbox(false);
 
+                    UI.PopStyle();
+
                     //UI.Style.PreferredWidth = 400f;
-                    UI.Style.MinWidth = 724f;
-					//UI.Style.FlexibleWidth = 400f;
+                    //UI.Style.MinWidth = 724f;
+                    //UI.Style.FlexibleWidth = 400f;
 
                     Component c = s.GetComponent(t);
 					bool subscribe = false;
@@ -361,7 +366,7 @@ namespace SyncMemberManipulator
 						//subscribe = true;
 					}
 					ISyncMember generatedMember = c.GetSyncMember(memberName);
-					((IField)generatedMember).BoxedValue = ((IField)syncMember).BoxedValue;
+                    ((IField)generatedMember).BoxedValue = ((IField)syncMember).BoxedValue;
 					SyncMemberEditorBuilder.Build(generatedMember, syncMember.Name, fieldInfo, UI);
 					if (subscribe)
 					{
@@ -373,55 +378,8 @@ namespace SyncMemberManipulator
 					syncMemberNameFields.Add(syncMember.Name, fieldsStruct);
 
                     UI.NestOut();
-				}
-
-				UI.PopStyle();
+                }
             }
-
-			//void CreatePanelWithMethodParameters(MethodInfo method)
-			//{
-			//    Slot root = WizardSlot.LocalUserSpace.AddSlot("Test Panel with Args");
-			//    UIBuilder UI = CreatePanel(root, root.Name, new float2(800, 800));
-
-			//    VerticalLayout verticalLayout = UI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
-			//    verticalLayout.ForceExpandHeight.Value = false;
-
-			//    ParameterInfo[] parameters = method.GetParameters();
-			//    int i = 0;
-			//    foreach (ParameterInfo param in parameters)
-			//    {
-			//        Slot s = WizardDataSlot.FindChildOrAdd(i.ToString() + "_" + param.Name);
-			//        if (param.ParameterType.IsValueType)
-			//        {
-			//            Type t = typeof(ValueField<>).MakeGenericType(param.ParameterType);
-			//            Component c = s.AttachComponent(t);
-			//            SyncMemberEditorBuilder.Build(c.GetSyncMember("Value"), param.Name, null, UI);
-			//        }
-			//        else
-			//        {
-			//            Type t = typeof(ReferenceField<>).MakeGenericType(param.ParameterType);
-			//            Component c = s.AttachComponent(t);
-			//            SyncMemberEditorBuilder.Build(c.GetSyncMember("Reference"), param.Name, null, UI);
-			//        }
-			//        i++;
-			//    }
-			//}
-
-			// ===== ACTIONS =====
-
-			//void EditStyle(IButton button, ButtonEventData eventData)
-			//{
-			//    WizardAction(button, eventData, () =>
-			//    {
-			//        Slot s = WizardSlot.LocalUserSpace.AddSlot("Style Edit Panel");
-			//        UIBuilder b = CreatePanel(s, s.Name, new float2(800, 1500));
-			//        b.Canvas.MarkDeveloper();
-			//        b.Canvas.AcceptPhysicalTouch.Value = false;
-			//        VerticalLayout verticalLayout = b.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
-			//        verticalLayout.ForceExpandHeight.Value = false;
-			//        GenerateStyleMemberEditors(b, currentBuilder.Style);
-			//    });
-			//}
 		}
 	}
 }
