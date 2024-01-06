@@ -4,12 +4,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("ModNameHere")]
+[assembly: AssemblyTitle("SyncMemberManipulator")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Nytra")]
-[assembly: AssemblyProduct("ModNameHere")]
-[assembly: AssemblyCopyright("Copyright © Nytra 2023")]
+[assembly: AssemblyProduct("SyncMemberManipulator")]
+[assembly: AssemblyCopyright("Copyright © Nytra 2024")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
