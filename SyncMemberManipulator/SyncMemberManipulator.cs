@@ -8,11 +8,14 @@ using System.Reflection;
 using FrooxEngine.Undo;
 using HarmonyLib;
 using Elements.Assets;
+using FrooxEngine.ProtoFlux;
+using System.IO;
+using Mono.Cecil;
 
 namespace SyncMemberManipulator
 {
-	public class SyncMemberManipulatorMod : ResoniteMod
-	{
+    public class SyncMemberManipulatorMod : ResoniteMod
+    {
 		public override string Name => "SyncMemberManipulator";
 		public override string Author => "Nytra";
 		public override string Version => "1.0.0";
@@ -66,22 +69,152 @@ namespace SyncMemberManipulator
 		[AutoRegisterConfigKey]
 		static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
 
-		static ModConfiguration config;
+        //[AutoRegisterConfigKey]
+        //static ModConfigurationKey<string> Key_TestString = new ModConfigurationKey<string>("Key_TestString", "Key_TestString", () => "TestStringOwo");
 
-		const string WIZARD_TITLE = "Component Field Manipulator (Mod)";
+        static ModConfiguration config;
+
+		static string WIZARD_TITLE = "Component Field Manipulator (Mod)";
+
+		static string wizardActionString; // dynamically generated with the system time
+
+		static string modReloadString = "Reload SyncMemberManipulator";
+
+        //static ResoniteMod mod;
+
+		// Very important method which is the entry point for hot-reloading
+		// This should be called after the previous instance of the mod has been unloaded
+		// And all relevant information has been transferred to the new assembly
+		static void OnHotReload(ResoniteModBase mod)
+		{
+            Msg("In OnHotReload!");
+			config = mod.GetConfiguration();
+			//Msg("Test string: " + config.GetValue(Key_TestString));
+			Setup();
+		}
+
+		static void Unload()
+		{
+			object categoryNode = AccessTools.Field(typeof(DevCreateNewForm), "root").GetValue(null);
+			object subcategory = AccessTools.Method(categoryNode.GetType(), "GetSubcategory").Invoke(categoryNode, new object[] { "Editor" });
+            System.Collections.IList elements = (System.Collections.IList)AccessTools.Field(categoryNode.GetType(), "_elements").GetValue(subcategory);
+			if (elements == null)
+			{
+				Msg("Elements is null!");
+				return;
+			}
+            foreach (object categoryItem in elements)
+            {
+                var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
+                //var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
+                if (name == wizardActionString)
+                {
+                    elements.Remove(categoryItem);
+                    break;
+                }
+            }
+            foreach (object categoryItem in elements)
+            {
+                var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
+                //var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
+                if (name == modReloadString)
+                {
+                    elements.Remove(categoryItem);
+                    break;
+                }
+            }
+        }
+
+		static ResoniteModBase GetMod()
+		{
+			foreach (ResoniteModBase mod in ModLoader.Mods())
+			{
+				if (mod.GetType().Name == typeof(SyncMemberManipulatorMod).Name)
+				{
+					return mod;
+				}
+			}
+			return null;
+		}
 
 		public override void OnEngineInit()
 		{
-			config = GetConfiguration();
-			Engine.Current.RunPostInit(AddMenuOption);
-		}
-		void AddMenuOption()
-		{
-			DevCreateNewForm.AddAction("Editor", WIZARD_TITLE, (x) => SyncMemberManipulator.CreateWizard(x));
+            config = GetConfiguration();
+            Engine.Current.RunPostInit(Setup);
 		}
 
-		class SyncMemberManipulator
+		static void AddMenuOption()
 		{
+            DateTime utcNow = DateTime.UtcNow;
+			wizardActionString = WIZARD_TITLE + utcNow.ToString();
+            DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => SyncMemberManipulator.CreateWizard(slot));
+		}
+
+		static void Setup()
+		{
+			AddMenuOption();
+			Msg("Added menu option.");
+            DevCreateNewForm.AddAction("Editor", modReloadString, (x) =>
+            {
+				x.Destroy();
+
+                Msg("Reload button pressed.");
+                Msg("Unloading mod...");
+
+				// Basically does the opposite of what the mod does when it loads
+				// Implemented by mod developer
+                Unload();
+
+                Msg("Loading the new assembly...");
+
+                string dllPath = "G:\\SteamLibrary\\steamapps\\common\\Resonite\\rml_mods\\HotReloadMods\\SyncMemberManipulator.dll";
+				var assemblyDefinition = AssemblyDefinition.ReadAssembly(dllPath);
+                assemblyDefinition.Name.Name += "-" + DateTime.Now.Ticks.ToString();
+				var memoryStream = new MemoryStream();
+                assemblyDefinition.Write(memoryStream);
+                Assembly assembly = Assembly.Load(memoryStream.ToArray());
+
+                Msg("Loaded assembly: " + assembly.FullName);
+
+                Type targetType = null;
+                foreach (Type type in assembly.GetTypes())
+                {
+                    // The name of the ResoniteMod type 
+                    if (type.Name.StartsWith(typeof(SyncMemberManipulatorMod).Name))
+                    {
+                        Msg("Found ResoniteMod type: " + type.Name);
+                        targetType = type;
+                        break;
+                    }
+                }
+
+                if (targetType != null)
+                {
+                    // Transfer the instance of ResoniteMod to the new assembly
+                    //AccessTools.Field(targetType, "mod").SetValue(null, mod);
+                    MethodInfo method = AccessTools.Method(targetType, "OnHotReload");
+                    if (method != null)
+                    {
+                        Msg("Invoking OnHotReload method...");
+						//ResoniteModBase mod = GetMod();
+						//mod.GetConfiguration().
+						method.Invoke(null, new object[] { GetMod() });
+                    }
+                    else
+                    {
+                        Error("OnHotReload method is null!");
+                    }
+                }
+                else
+                {
+                    Error("ResoniteMod type is null!");
+                }
+            });
+			Msg("Reload action added.");
+        }
+
+        public class SyncMemberManipulator
+        {
 			public static SyncMemberManipulator CreateWizard(Slot x)
 			{
 				return new SyncMemberManipulator(x);
@@ -99,23 +232,23 @@ namespace SyncMemberManipulator
 			UIBuilder WizardUI;
 
 			ReferenceField<Slot> searchRoot;
-			ReferenceField<Component> searchComponent;
+			ReferenceField<Component> sourceComponent;
 
 			struct SyncMemberWizardFields
 			{
-				public IField editorField; // the field that the user types the value into
-				public IField<bool> enabledField; // the checkbox that determines if the field value should be copied out to other components
+				public ISyncMember sourceSyncMember; // the syncMember to copy from
+				public IField<bool> enabledField; // the checkbox that determines if the syncMember should be copied out to other components
 			}
 
 			// <workerName, <memberName, SyncMemberWizardFields>>
 			Dictionary<string, Dictionary<string, SyncMemberWizardFields>> workerMemberFields = new Dictionary<string, Dictionary<string, SyncMemberWizardFields>>();
 
-			const float CANVAS_WIDTH_DEFAULT = 800f;
+			const float CANVAS_WIDTH_DEFAULT = 800f; // 800f
 			const float CANVAS_HEIGHT_DEFAULT = 1200f;
 
 			SyncMemberManipulator(Slot x)
 			{
-				WizardSlot = x;
+                WizardSlot = x;
 				WizardSlot.Tag = "Developer";
 				WizardSlot.PersistentSelf = false;
 				WizardSlot.LocalScale *= 0.0006f;
@@ -199,17 +332,15 @@ namespace SyncMemberManipulator
 
 				searchRoot = WizardSearchDataSlot.FindChildOrAdd("searchRoot").GetComponentOrAttach<ReferenceField<Slot>>();
 				searchRoot.Reference.Target = WizardSlot.World.RootSlot;
-				searchComponent = WizardSearchDataSlot.FindChildOrAdd("searchComponent").GetComponentOrAttach<ReferenceField<Component>>();
+				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
 
 				VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 				verticalLayout.ForceExpandHeight.Value = false;
 
-				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Search Root", null, WizardUI);
-				SyncMemberEditorBuilder.Build(searchComponent.Reference, "Component Type", null, WizardUI);
+				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Hierarchy Root Slot", null, WizardUI);
+				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
 
 				WizardUI.Spacer(24f);
-
-				
 
 				WizardUI.PushStyle();
 
@@ -228,10 +359,7 @@ namespace SyncMemberManipulator
 
 				WizardUI.PopStyle();
 
-				//WizardGeneratedFieldsSlot = WizardUI.Root;
-				//WizardGeneratedFieldsRect = WizardUI.CurrentRect;
-
-				searchComponent.Reference.Changed += (reference) => 
+				sourceComponent.Reference.Changed += (reference) => 
 				{
 					WizardGeneratedFieldsDataSlot.DestroyChildren();
 					WizardGeneratedContentSlot.DestroyChildren();
@@ -264,7 +392,7 @@ namespace SyncMemberManipulator
 						WizardUI.PopStyle();
 
 						WizardUI.Text("Component Fields");
-						WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
+                        WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
 						WizardUI.Spacer(24f);
 						WizardUI.Button("Select All").LocalPressed += (btn, data) => 
 						{
@@ -287,7 +415,9 @@ namespace SyncMemberManipulator
 
 						workerMemberFields.Clear();
 
-						GenerateWorkerMemberEditors(WizardUI, searchComponent.Reference.Target);
+						//dummyComponent = WizardGeneratedFieldsDataSlot.AddSlot(searchComponent.Reference.Target.Name).AttachComponent(searchComponent.Reference.Target.GetType());
+
+						GenerateWorkerMemberEditors(WizardUI, sourceComponent.Reference.Target);
 
 						WizardUI.PopStyle();
 
@@ -300,7 +430,7 @@ namespace SyncMemberManipulator
 							Msg("Apply pressed");
 							Apply();
 						};
-						//WizardUI.Panel();
+
 						WizardUI.Spacer(24f);
 					}
 					UpdateCanvasSize();
@@ -319,16 +449,15 @@ namespace SyncMemberManipulator
 				{
 					Msg("syncMember Name: " + syncMember.Name);
 					
-					if (syncMember is Worker)
+					if (syncMember is SyncObject)
 					{
-						Msg("Is worker");
+						Msg("Is SyncObject");
 						HandleWorker((Worker)syncMember);
 					}
-					else
+					else if (syncMember is IField)
 					{
 						if (!workerMemberFields[worker.Name].ContainsKey(syncMember.Name))
 						{
-							// it is probably an unsupported type like list
 							Warn("syncMember not in dictionary. Skipping.");
 							continue;
 						}
@@ -337,22 +466,27 @@ namespace SyncMemberManipulator
 						IField field = ((IField)syncMember);
 						SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
 						if (fieldsStruct.enabledField.Value == false) continue;
-						if (field.BoxedValue == fieldsStruct.editorField.BoxedValue) continue;
 						field.CreateUndoPoint();
-						field.BoxedValue = fieldsStruct.editorField.BoxedValue;
+						IField sourceMember = (IField)fieldsStruct.sourceSyncMember;
+						field.BoxedValue = sourceMember.BoxedValue;
+					}
+					else
+					{
+						// lists etc unsupported for now
 					}
 				}
 			}
 
 			private void Apply()
 			{
-				if (searchRoot.Reference.Target == null || searchComponent.Reference.Target == null) return;
+				if (searchRoot.Reference.Target == null || sourceComponent.Reference.Target == null) return;
 
 				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
 				WizardSlot.World.BeginUndoBatch("Set component fields");
 
-				foreach(Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) => c.GetType() == searchComponent.Reference.Target.GetType()))
+				foreach(Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) => 
+					c.GetType() == sourceComponent.Reference.Target.GetType() && c != sourceComponent.Reference.Target))
 				{
 					Msg(c.Name);
 					HandleWorker(c);
@@ -370,115 +504,84 @@ namespace SyncMemberManipulator
 				{
 					i += 1;
 
-					// This will only work for fields, not things like lists or bags
-					if (!(syncMember is IField)) 
+					Type type = null;
+
+					if (syncMember is IField field)
 					{
-						if (syncMember is Worker)
+						type = field.ValueType;
+					}
+					else if (syncMember is ISyncRef syncRef)
+					{
+						type = syncRef.TargetType;
+					}
+					else
+					{
+						type = syncMember.GetType();
+					}
+
+					colorX c = type.GetTypeColor().MulRGB(1.5f);
+                    UI.Style.TextColor = MathX.LerpUnclamped(RadiantUI_Constants.TEXT_COLOR, c, 0.1f);
+					//UI.Style.TextColor = RandomX.Hue;
+
+                    if (syncMember is SyncObject)
+					{
+						UI.PushStyle();
+						UI.Style.PreferredHeight = 24f;
+						UI.Text($"{syncMember.Name}").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+						UI.PopStyle();
+						if (recursive)
 						{
 							UI.PushStyle();
-							UI.Style.PreferredHeight = 24f;
-							UI.Text($"<color=#00dd00>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (worker)</color>").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+							UI.HorizontalLayout();
+							UI.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
+							UI.Style.MinWidth = 16f;
+							UI.Style.FlexibleWidth = -1;
+							UI.Panel();
+							colorX color = colorX.Black;
+							UI.Image(in color);
+							UI.CurrentRect.OffsetMin.Value = new float2(UI.Style.MinWidth * 0.5f - 2f);
+							UI.CurrentRect.OffsetMax.Value = new float2(0f - (UI.Style.MinWidth * 0.5f - 2f));
+							UI.NestOut();
+
+							VerticalLayout verticalLayout = UI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
+							verticalLayout.ForceExpandHeight.Value = false;
+							verticalLayout.PaddingLeft.Value = 6f;
+
 							UI.PopStyle();
-							if (recursive)
-							{
-								UI.PushStyle();
-								UI.HorizontalLayout();
-								UI.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
-								UI.Style.MinWidth = 16f;
-								UI.Style.FlexibleWidth = -1;
-								UI.Panel();
-								colorX color = colorX.Black;
-								UI.Image(in color);
-								UI.CurrentRect.OffsetMin.Value = new float2(UI.Style.MinWidth * 0.5f - 2f);
-								UI.CurrentRect.OffsetMax.Value = new float2(0f - (UI.Style.MinWidth * 0.5f - 2f));
-								UI.NestOut();
 
-								VerticalLayout verticalLayout = UI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
-								verticalLayout.ForceExpandHeight.Value = false;
-								verticalLayout.PaddingLeft.Value = 6f; // 24f
+							GenerateWorkerMemberEditors(UI, (Worker)syncMember);
 
-								UI.PopStyle();
-
-								GenerateWorkerMemberEditors(UI, (Worker)syncMember);
-
-								UI.NestOut();
-								UI.NestOut();
-							}
-						}
-						else
-						{
-							UI.PushStyle();
-							UI.Style.PreferredHeight = 24f;
-							UI.Text($"<color=gray>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (not supported)</color>");
-							UI.PopStyle();
-						}
+							UI.NestOut();
+							UI.NestOut();
+                        }
+                        continue;
+                    }
+					else if (!(syncMember is IField))
+					{
+                        UI.PushStyle();
+                        UI.Style.PreferredHeight = 24f;
+						UI.Style.TextColor = colorX.Gray;
+                        UI.Text($"{syncMember.Name} (not supported)").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+                        UI.PopStyle();
 						continue;
-					}
+                    }
 
-					Type genericTypeDefinition = null;
-					if (syncMember.GetType().IsGenericType)
-					{
-						genericTypeDefinition = syncMember.GetType().GetGenericTypeDefinition();
-					}
+					//Type genericTypeDefinition = null;
+					//if (syncMember.GetType().IsGenericType)
+					//{
+					//	genericTypeDefinition = syncMember.GetType().GetGenericTypeDefinition();
+					//}
 
 					FieldInfo fieldInfo = targetWorker.GetSyncMemberFieldInfo(syncMember.Name);
 
-					Type t = null;
-					string memberName = null;
+					//Slot s = WizardGeneratedFieldsDataSlot.FindChildOrAdd(targetWorker.Name + ":" + i.ToString() + "_" + syncMember.Name);
 
-					try
-					{
-						if (genericTypeDefinition == typeof(Sync<>))
-						{
-							t = typeof(ValueField<>).MakeGenericType(((IField)syncMember).ValueType);
-							memberName = "Value";
-						}
-						else if (genericTypeDefinition == typeof(AssetRef<>))
-						{
-							t = typeof(AssetLoader<>).MakeGenericType(syncMember.GetType().GetGenericArguments()[0]);
-							memberName = "Asset";
-						}
-						else if (syncMember is SyncType)
-						{
-							t = typeof(TypeField);
-							memberName = "Type";
-						}
-						else if (genericTypeDefinition == typeof(SyncDelegate<>))
-						{
-							t = typeof(DelegateTag<>).MakeGenericType(((ISyncRef)syncMember).TargetType);
-							memberName = "Delegate";
-						}
-						else if (syncMember is ISyncRef)
-						{
-							t = typeof(ReferenceField<>).MakeGenericType(((ISyncRef)syncMember).TargetType);
-							memberName = "Reference";
-						}
-					}
-					catch (Exception e)
-					{
-						Error(e.ToString());
-						UI.PushStyle();
-						UI.Style.PreferredHeight = 24f;
-						UI.Text($"<color=red>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (threw exception)</color>");
-						UI.PopStyle();
-						continue;
-					}
-					
+					var horizontalLayout = UI.HorizontalLayout(4f, childAlignment: Alignment.MiddleLeft);
+                    horizontalLayout.ForceExpandWidth.Value = false;
+					//horizontalLayout.PaddingLeft.Value = CANVAS_WIDTH_DEFAULT / 4f;
 
-					if (t == null || memberName == null)
-					{
-						UI.PushStyle();
-						UI.Style.PreferredHeight = 24f;
-						UI.Text($"<color=sub.purple>{syncMember.Name}:{syncMember.GetType().GetNiceName()} (should be supported?)</color>");
-						UI.PopStyle();
-						continue;
-					};
 
-					Slot s = WizardGeneratedFieldsDataSlot.FindChildOrAdd(targetWorker.Name + ":" + i.ToString() + "_" + syncMember.Name);
-
-					UI.HorizontalLayout(4f, childAlignment: Alignment.MiddleLeft).ForceExpandWidth.Value = false;
-
-					UI.PushStyle();
+                    UI.PushStyle();
 
 					WizardUI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
 					WizardUI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
@@ -491,27 +594,17 @@ namespace SyncMemberManipulator
 
 					UI.PopStyle();
 
-					Component c = s.GetComponent(t);
-					bool subscribe = false;
-					if (c == null)
-					{
-						// this could cause an exception if t is an invalid component type
-						c = s.AttachComponent(t);
+					//SyncMemberEditorBuilder.Build(syncMember, syncMember.Name, fieldInfo, UI);
 
-						//subscribe = true;
-					}
-					ISyncMember generatedMember = c.GetSyncMember(memberName);
+					UI.PushStyle();
+                    UI.Style.PreferredHeight = 24f;
+                    UI.Text($"{syncMember.Name}").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+					UI.PopStyle();
 
-					// this can sometimes cause an exception?
-					((IField)generatedMember).BoxedValue = ((IField)syncMember).BoxedValue;
+					//UI.MemberEditor((IField)syncMember, )
 
-					SyncMemberEditorBuilder.Build(generatedMember, syncMember.Name, fieldInfo, UI);
-					if (subscribe)
-					{
-						generatedMember.Changed += (value) => { ((IField)syncMember).BoxedValue = ((IField)value).BoxedValue; };
-					}
 					SyncMemberWizardFields fieldsStruct = new SyncMemberWizardFields();
-					fieldsStruct.editorField = (IField)generatedMember;
+					fieldsStruct.sourceSyncMember = syncMember;
 					fieldsStruct.enabledField = checkbox.State;
 
 					workerMemberFields[targetWorker.Name].Add(syncMember.Name, fieldsStruct);
