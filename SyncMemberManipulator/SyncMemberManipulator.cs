@@ -9,13 +9,12 @@ using FrooxEngine.Undo;
 using HarmonyLib;
 using Elements.Assets;
 using FrooxEngine.ProtoFlux;
-using System.IO;
-using Mono.Cecil;
+using ResoniteHotReloadLib;
 
 namespace SyncMemberManipulator
 {
-    public class SyncMemberManipulatorMod : ResoniteMod
-    {
+	public class SyncMemberManipulatorMod : ResoniteMod
+	{
 		public override string Name => "SyncMemberManipulator";
 		public override string Author => "Nytra";
 		public override string Version => "1.0.0";
@@ -69,10 +68,7 @@ namespace SyncMemberManipulator
 		[AutoRegisterConfigKey]
 		static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
 
-        //[AutoRegisterConfigKey]
-        //static ModConfigurationKey<string> Key_TestString = new ModConfigurationKey<string>("Key_TestString", "Key_TestString", () => "TestStringOwo");
-
-        static ModConfiguration config;
+		static ModConfiguration config;
 
 		static string WIZARD_TITLE = "Component Field Manipulator (Mod)";
 
@@ -80,141 +76,86 @@ namespace SyncMemberManipulator
 
 		static string modReloadString = "Reload SyncMemberManipulator";
 
-        //static ResoniteMod mod;
+		static Harmony harmony;
 
-		// Very important method which is the entry point for hot-reloading
-		// This should be called after the previous instance of the mod has been unloaded
-		// And all relevant information has been transferred to the new assembly
-		static void OnHotReload(ResoniteModBase mod)
+		public override void OnEngineInit()
 		{
-            Msg("In OnHotReload!");
-			config = mod.GetConfiguration();
-			//Msg("Test string: " + config.GetValue(Key_TestString));
-			Setup();
+			config = GetConfiguration();
+			HotReloader.RegisterForHotReload(this);
+			Engine.Current.RunPostInit(Setup);
 		}
 
-		static void Unload()
+		// Called immediately before the new assembly is loaded
+		// Mod should unload itself completely here and remove all harmony patches etc.
+		static void BeforeHotReload()
 		{
+			Msg("In BeforeHotReload!");
+			//harmony.UnpatchAll("owo.Nytra.Test");
 			object categoryNode = AccessTools.Field(typeof(DevCreateNewForm), "root").GetValue(null);
 			object subcategory = AccessTools.Method(categoryNode.GetType(), "GetSubcategory").Invoke(categoryNode, new object[] { "Editor" });
-            System.Collections.IList elements = (System.Collections.IList)AccessTools.Field(categoryNode.GetType(), "_elements").GetValue(subcategory);
+			System.Collections.IList elements = (System.Collections.IList)AccessTools.Field(categoryNode.GetType(), "_elements").GetValue(subcategory);
 			if (elements == null)
 			{
 				Msg("Elements is null!");
 				return;
 			}
-            foreach (object categoryItem in elements)
-            {
-                var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
-                //var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
-                if (name == wizardActionString)
-                {
-                    elements.Remove(categoryItem);
-                    break;
-                }
-            }
-            foreach (object categoryItem in elements)
-            {
-                var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
-                //var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
-                if (name == modReloadString)
-                {
-                    elements.Remove(categoryItem);
-                    break;
-                }
-            }
-        }
-
-		static ResoniteModBase GetMod()
-		{
-			foreach (ResoniteModBase mod in ModLoader.Mods())
+			foreach (object categoryItem in elements)
 			{
-				if (mod.GetType().Name == typeof(SyncMemberManipulatorMod).Name)
+				var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
+				//var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
+				if (name == wizardActionString)
 				{
-					return mod;
+					elements.Remove(categoryItem);
+					break;
 				}
 			}
-			return null;
+			foreach (object categoryItem in elements)
+			{
+				var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
+				//var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
+				if (name == modReloadString)
+				{
+					elements.Remove(categoryItem);
+					break;
+				}
+			}
 		}
 
-		public override void OnEngineInit()
+		// Very important method which is the entry point for hot-reloading
+		// This should be called after the previous instance of the mod has been unloaded
+		static void OnHotReload(ResoniteMod modInstance)
 		{
-            config = GetConfiguration();
-            Engine.Current.RunPostInit(Setup);
+			Msg("In OnHotReload!");
+			config = modInstance.GetConfiguration();
+			Setup();
 		}
 
 		static void AddMenuOption()
 		{
-            DateTime utcNow = DateTime.UtcNow;
+			DateTime utcNow = DateTime.UtcNow;
 			wizardActionString = WIZARD_TITLE + utcNow.ToString();
-            DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => SyncMemberManipulator.CreateWizard(slot));
+			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => SyncMemberManipulator.CreateWizard(slot));
 		}
 
 		static void Setup()
 		{
+			//harmony = new Harmony("owo.Nytra.Test");
+			//harmony.PatchAll();
 			AddMenuOption();
 			Msg("Added menu option.");
-            DevCreateNewForm.AddAction("Editor", modReloadString, (x) =>
-            {
+			DevCreateNewForm.AddAction("Editor", modReloadString, (x) =>
+			{
 				x.Destroy();
 
-                Msg("Reload button pressed.");
-                Msg("Unloading mod...");
+				Msg("Reload button pressed.");
 
-				// Basically does the opposite of what the mod does when it loads
-				// Implemented by mod developer
-                Unload();
-
-                Msg("Loading the new assembly...");
-
-                string dllPath = "G:\\SteamLibrary\\steamapps\\common\\Resonite\\rml_mods\\HotReloadMods\\SyncMemberManipulator.dll";
-				var assemblyDefinition = AssemblyDefinition.ReadAssembly(dllPath);
-                assemblyDefinition.Name.Name += "-" + DateTime.Now.Ticks.ToString();
-				var memoryStream = new MemoryStream();
-                assemblyDefinition.Write(memoryStream);
-                Assembly assembly = Assembly.Load(memoryStream.ToArray());
-
-                Msg("Loaded assembly: " + assembly.FullName);
-
-                Type targetType = null;
-                foreach (Type type in assembly.GetTypes())
-                {
-                    // The name of the ResoniteMod type 
-                    if (type.Name.StartsWith(typeof(SyncMemberManipulatorMod).Name))
-                    {
-                        Msg("Found ResoniteMod type: " + type.Name);
-                        targetType = type;
-                        break;
-                    }
-                }
-
-                if (targetType != null)
-                {
-                    // Transfer the instance of ResoniteMod to the new assembly
-                    //AccessTools.Field(targetType, "mod").SetValue(null, mod);
-                    MethodInfo method = AccessTools.Method(targetType, "OnHotReload");
-                    if (method != null)
-                    {
-                        Msg("Invoking OnHotReload method...");
-						//ResoniteModBase mod = GetMod();
-						//mod.GetConfiguration().
-						method.Invoke(null, new object[] { GetMod() });
-                    }
-                    else
-                    {
-                        Error("OnHotReload method is null!");
-                    }
-                }
-                else
-                {
-                    Error("ResoniteMod type is null!");
-                }
-            });
+				HotReloader.HotReload(typeof(SyncMemberManipulatorMod));
+			});
 			Msg("Reload action added.");
-        }
+		}
 
-        public class SyncMemberManipulator
-        {
+		public class SyncMemberManipulator
+		{
 			public static SyncMemberManipulator CreateWizard(Slot x)
 			{
 				return new SyncMemberManipulator(x);
@@ -248,7 +189,7 @@ namespace SyncMemberManipulator
 
 			SyncMemberManipulator(Slot x)
 			{
-                WizardSlot = x;
+				WizardSlot = x;
 				WizardSlot.Tag = "Developer";
 				WizardSlot.PersistentSelf = false;
 				WizardSlot.LocalScale *= 0.0006f;
@@ -392,7 +333,7 @@ namespace SyncMemberManipulator
 						WizardUI.PopStyle();
 
 						WizardUI.Text("Component Fields");
-                        WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
+						WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
 						WizardUI.Spacer(24f);
 						WizardUI.Button("Select All").LocalPressed += (btn, data) => 
 						{
@@ -520,10 +461,10 @@ namespace SyncMemberManipulator
 					}
 
 					colorX c = type.GetTypeColor().MulRGB(1.5f);
-                    UI.Style.TextColor = MathX.LerpUnclamped(RadiantUI_Constants.TEXT_COLOR, c, 0.1f);
-					//UI.Style.TextColor = RandomX.Hue;
+					UI.Style.TextColor = MathX.LerpUnclamped(RadiantUI_Constants.TEXT_COLOR, c, 0.1f);
+					//UI.Style.TextColor = colorX.Yellow;
 
-                    if (syncMember is SyncObject)
+					if (syncMember is SyncObject)
 					{
 						UI.PushStyle();
 						UI.Style.PreferredHeight = 24f;
@@ -553,18 +494,18 @@ namespace SyncMemberManipulator
 
 							UI.NestOut();
 							UI.NestOut();
-                        }
-                        continue;
-                    }
+						}
+						continue;
+					}
 					else if (!(syncMember is IField))
 					{
-                        UI.PushStyle();
-                        UI.Style.PreferredHeight = 24f;
+						UI.PushStyle();
+						UI.Style.PreferredHeight = 24f;
 						UI.Style.TextColor = colorX.Gray;
-                        UI.Text($"{syncMember.Name} (not supported)").HorizontalAlign.Value = TextHorizontalAlignment.Left;
-                        UI.PopStyle();
+						UI.Text($"{syncMember.Name} (not supported)").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+						UI.PopStyle();
 						continue;
-                    }
+					}
 
 					//Type genericTypeDefinition = null;
 					//if (syncMember.GetType().IsGenericType)
@@ -577,11 +518,11 @@ namespace SyncMemberManipulator
 					//Slot s = WizardGeneratedFieldsDataSlot.FindChildOrAdd(targetWorker.Name + ":" + i.ToString() + "_" + syncMember.Name);
 
 					var horizontalLayout = UI.HorizontalLayout(4f, childAlignment: Alignment.MiddleLeft);
-                    horizontalLayout.ForceExpandWidth.Value = false;
+					horizontalLayout.ForceExpandWidth.Value = false;
 					//horizontalLayout.PaddingLeft.Value = CANVAS_WIDTH_DEFAULT / 4f;
 
 
-                    UI.PushStyle();
+					UI.PushStyle();
 
 					WizardUI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
 					WizardUI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
@@ -597,8 +538,8 @@ namespace SyncMemberManipulator
 					//SyncMemberEditorBuilder.Build(syncMember, syncMember.Name, fieldInfo, UI);
 
 					UI.PushStyle();
-                    UI.Style.PreferredHeight = 24f;
-                    UI.Text($"{syncMember.Name}").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+					UI.Style.PreferredHeight = 24f;
+					UI.Text($"{syncMember.Name}").HorizontalAlign.Value = TextHorizontalAlignment.Left;
 					UI.PopStyle();
 
 					//UI.MemberEditor((IField)syncMember, )
