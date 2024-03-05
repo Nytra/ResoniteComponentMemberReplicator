@@ -10,12 +10,14 @@ using HarmonyLib;
 using Elements.Assets;
 using FrooxEngine.ProtoFlux;
 using ResoniteHotReloadLib;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SyncMemberManipulator
 {
 	public class SyncMemberManipulatorMod : ResoniteMod
 	{
-		public override string Name => "SyncMemberManipulator";
+		public override string Name => "ComponentFieldManipulator";
 		public override string Author => "Nytra";
 		public override string Version => "1.0.0";
 		public override string Link => "https://github.com/Nytra/ResoniteSyncMemberManipulator";
@@ -70,13 +72,21 @@ namespace SyncMemberManipulator
 
 		static ModConfiguration config;
 
-		static string WIZARD_TITLE = "Component Field Manipulator (Mod)";
+		static string WIZARD_TITLE 
+		{ 
+			get 
+			{
+				string s = "Component Field Manipulator (Mod)";
+				s += " " + HotReloader.GetReloadedCountOfModType(typeof(SyncMemberManipulatorMod)).ToString();
+				return s;
+			} 
+		}
 
-		static string wizardActionString; // dynamically generated with the system time
+		static string wizardActionString => WIZARD_TITLE;
 
-		static string modReloadString = "Reload SyncMemberManipulator";
+		//static string modReloadString = "Reload SyncMemberManipulator";
 
-		static Harmony harmony;
+		//static Harmony harmony;
 
 		public override void OnEngineInit()
 		{
@@ -91,34 +101,8 @@ namespace SyncMemberManipulator
 		{
 			Msg("In BeforeHotReload!");
 			//harmony.UnpatchAll("owo.Nytra.Test");
-			object categoryNode = AccessTools.Field(typeof(DevCreateNewForm), "root").GetValue(null);
-			object subcategory = AccessTools.Method(categoryNode.GetType(), "GetSubcategory").Invoke(categoryNode, new object[] { "Editor" });
-			System.Collections.IList elements = (System.Collections.IList)AccessTools.Field(categoryNode.GetType(), "_elements").GetValue(subcategory);
-			if (elements == null)
-			{
-				Msg("Elements is null!");
-				return;
-			}
-			foreach (object categoryItem in elements)
-			{
-				var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
-				//var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
-				if (name == wizardActionString)
-				{
-					elements.Remove(categoryItem);
-					break;
-				}
-			}
-			foreach (object categoryItem in elements)
-			{
-				var name = (string)AccessTools.Field(categoryNode.GetType().GetGenericArguments()[0], "name").GetValue(categoryItem);
-				//var action = (Action<Slot>)AccessTools.Field(categoryItemType, "action").GetValue(categoryItem);
-				if (name == modReloadString)
-				{
-					elements.Remove(categoryItem);
-					break;
-				}
-			}
+
+			HotReloader.RemoveMenuOption("Editor", wizardActionString);
 		}
 
 		// Very important method which is the entry point for hot-reloading
@@ -132,8 +116,8 @@ namespace SyncMemberManipulator
 
 		static void AddMenuOption()
 		{
-			DateTime utcNow = DateTime.UtcNow;
-			wizardActionString = WIZARD_TITLE + utcNow.ToString();
+			//DateTime utcNow = DateTime.UtcNow;
+			//wizardActionString = WIZARD_TITLE + utcNow.ToString();
 			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => SyncMemberManipulator.CreateWizard(slot));
 		}
 
@@ -142,16 +126,16 @@ namespace SyncMemberManipulator
 			//harmony = new Harmony("owo.Nytra.Test");
 			//harmony.PatchAll();
 			AddMenuOption();
-			Msg("Added menu option.");
-			DevCreateNewForm.AddAction("Editor", modReloadString, (x) =>
-			{
-				x.Destroy();
+			//Msg("Added menu option.");
+			//DevCreateNewForm.AddAction("Editor", modReloadString, (x) =>
+			//{
+			//	x.Destroy();
 
-				Msg("Reload button pressed.");
+			//	Msg("Reload button pressed.");
 
-				HotReloader.HotReload(typeof(SyncMemberManipulatorMod));
-			});
-			Msg("Reload action added.");
+			//	HotReloader.HotReload(typeof(SyncMemberManipulatorMod));
+			//});
+			//Msg("Reload action added.");
 		}
 
 		public class SyncMemberManipulator
@@ -236,31 +220,31 @@ namespace SyncMemberManipulator
 				WizardUI.Canvas.Size.Value = new float2(CANVAS_WIDTH_DEFAULT, CANVAS_HEIGHT_DEFAULT);
 				return;
 
-				WizardSlot.RunInUpdates(30, () => 
-				{
-					// supposed to be the size of the canvas that is actually used
-					// 80 is height of panel header. 24 is extra padding to make it stop scrolling when it doesn't need to
-					float newY = 80 + 24 + 12;
-					foreach(Slot childSlot in WizardStaticContentSlot.Children)
-					{
-						if (childSlot.GetComponent<VerticalLayout>() != null) continue;
+				//WizardSlot.RunInUpdates(30, () => 
+				//{
+				//	// supposed to be the size of the canvas that is actually used
+				//	// 80 is height of panel header. 24 is extra padding to make it stop scrolling when it doesn't need to
+				//	float newY = 80 + 24 + 12;
+				//	foreach(Slot childSlot in WizardStaticContentSlot.Children)
+				//	{
+				//		if (childSlot.GetComponent<VerticalLayout>() != null) continue;
 
-						RectTransform rectTransform = childSlot.GetComponent<RectTransform>();
-						if (rectTransform != null && !rectTransform.IsRemoved)
-						{
-							newY += rectTransform.LocalComputeRect.size.y;
-						}
-					}
-					if (WizardGeneratedFieldsRect != null && !WizardGeneratedFieldsRect.IsRemoved)
-					{
-						newY += WizardGeneratedFieldsRect.LocalComputeRect.size.y;
-						if (WizardGeneratedContentRect != null && !WizardGeneratedContentRect.IsRemoved)
-						{
-							newY += WizardGeneratedFieldsRect.LocalComputeRect.size.y - WizardGeneratedContentRect.LocalComputeRect.size.y;
-						}
-					}
-					WizardUI.Canvas.Size.Value = new float2(CANVAS_WIDTH_DEFAULT, MathX.Min(newY, CANVAS_HEIGHT_DEFAULT));
-				});
+				//		RectTransform rectTransform = childSlot.GetComponent<RectTransform>();
+				//		if (rectTransform != null && !rectTransform.IsRemoved)
+				//		{
+				//			newY += rectTransform.LocalComputeRect.size.y;
+				//		}
+				//	}
+				//	if (WizardGeneratedFieldsRect != null && !WizardGeneratedFieldsRect.IsRemoved)
+				//	{
+				//		newY += WizardGeneratedFieldsRect.LocalComputeRect.size.y;
+				//		if (WizardGeneratedContentRect != null && !WizardGeneratedContentRect.IsRemoved)
+				//		{
+				//			newY += WizardGeneratedFieldsRect.LocalComputeRect.size.y - WizardGeneratedContentRect.LocalComputeRect.size.y;
+				//		}
+				//	}
+				//	WizardUI.Canvas.Size.Value = new float2(CANVAS_WIDTH_DEFAULT, MathX.Min(newY, CANVAS_HEIGHT_DEFAULT));
+				//});
 			}
 
 			void RegenerateWizardUI()
@@ -333,7 +317,7 @@ namespace SyncMemberManipulator
 						WizardUI.PopStyle();
 
 						WizardUI.Text("Component Fields");
-						WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
+						//WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
 						WizardUI.Spacer(24f);
 						WizardUI.Button("Select All").LocalPressed += (btn, data) => 
 						{
@@ -343,6 +327,7 @@ namespace SyncMemberManipulator
 						{
 							SetEnabledFields(false);
 						};
+
 						WizardUI.Spacer(24f);
 
 						WizardUI.PushStyle();
@@ -366,7 +351,7 @@ namespace SyncMemberManipulator
 						WizardUI.NestOut(); // Out of ScrollArea slot, Into WizardGeneratedContentSlot
 
 						WizardUI.Spacer(24f);
-						WizardUI.Button("Apply to Hierarchy (Undoable)").LocalPressed += (btn, data) => 
+						WizardUI.Button("Copy to Hierarchy (Undoable)").LocalPressed += (btn, data) => 
 						{
 							Msg("Apply pressed");
 							Apply();
@@ -414,6 +399,7 @@ namespace SyncMemberManipulator
 					else
 					{
 						// lists etc unsupported for now
+						Msg("syncMember is not supported type: " + syncMember.GetType().Name);
 					}
 				}
 			}
@@ -424,6 +410,7 @@ namespace SyncMemberManipulator
 
 				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
+				// it could be an empty undo batch if there are no matching components?
 				WizardSlot.World.BeginUndoBatch("Set component fields");
 
 				foreach(Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) => 
@@ -461,8 +448,7 @@ namespace SyncMemberManipulator
 					}
 
 					colorX c = type.GetTypeColor().MulRGB(1.5f);
-					UI.Style.TextColor = MathX.LerpUnclamped(RadiantUI_Constants.TEXT_COLOR, c, 0.1f);
-					//UI.Style.TextColor = colorX.Yellow;
+					UI.Style.TextColor = MathX.LerpUnclamped(RadiantUI_Constants.TEXT_COLOR, c, 0.1f); // copying the way field names get colored in the inspector
 
 					if (syncMember is SyncObject)
 					{
@@ -521,15 +507,23 @@ namespace SyncMemberManipulator
 					horizontalLayout.ForceExpandWidth.Value = false;
 					//horizontalLayout.PaddingLeft.Value = CANVAS_WIDTH_DEFAULT / 4f;
 
-
 					UI.PushStyle();
 
-					WizardUI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
-					WizardUI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
-					WizardUI.Style.PreferredWidth = config.GetValue(Key_CheckboxPreferredWidth);
-					WizardUI.Style.PreferredHeight = config.GetValue(Key_CheckboxPreferredHeight);
-					WizardUI.Style.FlexibleWidth = config.GetValue(Key_CheckboxFlexibleWidth);
-					WizardUI.Style.FlexibleHeight = config.GetValue(Key_CheckboxFlexibleHeight);
+					//WizardUI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
+					//WizardUI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
+					//WizardUI.Style.PreferredWidth = config.GetValue(Key_CheckboxPreferredWidth);
+					//WizardUI.Style.PreferredHeight = config.GetValue(Key_CheckboxPreferredHeight);
+					//WizardUI.Style.FlexibleWidth = config.GetValue(Key_CheckboxFlexibleWidth);
+					//WizardUI.Style.FlexibleHeight = config.GetValue(Key_CheckboxFlexibleHeight);
+
+					UI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
+					UI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
+					UI.Style.PreferredWidth = config.GetValue(Key_CheckboxPreferredWidth);
+					UI.Style.PreferredHeight = config.GetValue(Key_CheckboxPreferredHeight);
+					UI.Style.FlexibleWidth = config.GetValue(Key_CheckboxFlexibleWidth);
+					UI.Style.FlexibleHeight = config.GetValue(Key_CheckboxFlexibleHeight);
+
+					UI.Style.TextColor = RadiantUI_Constants.Neutrals.LIGHT;
 
 					var checkbox = UI.Checkbox(false);
 
