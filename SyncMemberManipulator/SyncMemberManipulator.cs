@@ -1,23 +1,20 @@
-using System.Collections.Generic;
-using ResoniteModLoader;
-using FrooxEngine;
-using FrooxEngine.UIX;
-using Elements.Core;
-using System;
-using System.Reflection;
-using FrooxEngine.Undo;
-using HarmonyLib;
 using Elements.Assets;
+using Elements.Core;
+using FrooxEngine;
 using FrooxEngine.ProtoFlux;
+using FrooxEngine.UIX;
+using FrooxEngine.Undo;
 using ResoniteHotReloadLib;
-using System.Linq;
-using System.Threading.Tasks;
+using ResoniteModLoader;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 
 namespace SyncMemberManipulator
 {
 	public class SyncMemberManipulatorMod : ResoniteMod
 	{
-		public override string Name => "ComponentFieldManipulator";
+		public override string Name => "ComponentFieldReplicator";
 		public override string Author => "Nytra";
 		public override string Version => "1.0.0";
 		public override string Link => "https://github.com/Nytra/ResoniteSyncMemberManipulator";
@@ -72,21 +69,17 @@ namespace SyncMemberManipulator
 
 		static ModConfiguration config;
 
-		static string WIZARD_TITLE 
-		{ 
-			get 
+		static string WIZARD_TITLE
+		{
+			get
 			{
-				string s = "Component Field Manipulator (Mod)";
+				string s = "Component Field Replicator (Mod)";
 				s += " " + HotReloader.GetReloadedCountOfModType(typeof(SyncMemberManipulatorMod)).ToString();
 				return s;
-			} 
+			}
 		}
 
 		static string wizardActionString => WIZARD_TITLE;
-
-		//static string modReloadString = "Reload SyncMemberManipulator";
-
-		//static Harmony harmony;
 
 		public override void OnEngineInit()
 		{
@@ -95,18 +88,12 @@ namespace SyncMemberManipulator
 			Engine.Current.RunPostInit(Setup);
 		}
 
-		// Called immediately before the new assembly is loaded
-		// Mod should unload itself completely here and remove all harmony patches etc.
 		static void BeforeHotReload()
 		{
 			Msg("In BeforeHotReload!");
-			//harmony.UnpatchAll("owo.Nytra.Test");
-
 			HotReloader.RemoveMenuOption("Editor", wizardActionString);
 		}
 
-		// Very important method which is the entry point for hot-reloading
-		// This should be called after the previous instance of the mod has been unloaded
 		static void OnHotReload(ResoniteMod modInstance)
 		{
 			Msg("In OnHotReload!");
@@ -123,19 +110,7 @@ namespace SyncMemberManipulator
 
 		static void Setup()
 		{
-			//harmony = new Harmony("owo.Nytra.Test");
-			//harmony.PatchAll();
 			AddMenuOption();
-			//Msg("Added menu option.");
-			//DevCreateNewForm.AddAction("Editor", modReloadString, (x) =>
-			//{
-			//	x.Destroy();
-
-			//	Msg("Reload button pressed.");
-
-			//	HotReloader.HotReload(typeof(SyncMemberManipulatorMod));
-			//});
-			//Msg("Reload action added.");
 		}
 
 		public class SyncMemberManipulator
@@ -147,17 +122,19 @@ namespace SyncMemberManipulator
 
 			Slot WizardSlot;
 			Slot WizardStaticContentSlot;
-			Slot WizardGeneratedFieldsSlot;
+			//Slot WizardGeneratedFieldsSlot;
 			RectTransform WizardStaticContentRect;
-			RectTransform WizardGeneratedFieldsRect;
+			//RectTransform WizardGeneratedFieldsRect;
 			Slot WizardGeneratedContentSlot;
-			RectTransform WizardGeneratedContentRect;
+			//RectTransform WizardGeneratedContentRect;
 			Slot WizardSearchDataSlot;
-			Slot WizardGeneratedFieldsDataSlot;
+			//Slot WizardGeneratedFieldsDataSlot;
 			UIBuilder WizardUI;
 
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> sourceComponent;
+
+			//Button applyButton;
 
 			struct SyncMemberWizardFields
 			{
@@ -179,7 +156,7 @@ namespace SyncMemberManipulator
 				WizardSlot.LocalScale *= 0.0006f;
 
 				WizardSearchDataSlot = WizardSlot.AddSlot("SearchData");
-				WizardGeneratedFieldsDataSlot = WizardSlot.AddSlot("FieldsData");
+				//WizardGeneratedFieldsDataSlot = WizardSlot.AddSlot("FieldsData");
 
 				WizardUI = RadiantUI_Panel.SetupPanel(WizardSlot, WIZARD_TITLE.AsLocaleKey(), new float2(CANVAS_WIDTH_DEFAULT, CANVAS_HEIGHT_DEFAULT));
 				RadiantUI_Constants.SetupEditorStyle(WizardUI);
@@ -213,10 +190,30 @@ namespace SyncMemberManipulator
 				}
 			}
 
+			//void UpdateApplyButtonEnabled()
+			//{
+			//	bool b = false;
+			//	foreach (Dictionary<string, SyncMemberWizardFields> dict in workerMemberFields.Values)
+			//	{
+			//		foreach (SyncMemberWizardFields fields in dict.Values)
+			//		{
+			//			if (fields.enabledField.Value == true)
+			//			{
+			//				b = true;
+			//				break;
+			//			}
+			//		}
+			//	}
+			//	if (applyButton != null && !applyButton.IsRemoved)
+			//	{
+			//		applyButton.Enabled = b && searchRoot.Reference.Target != null;
+			//	}
+			//}
+
 			void UpdateCanvasSize()
 			{
 				// I couldn't get this to work right
-				// So now the canvas is constant size lol
+				// So now the canvas is constant size
 				WizardUI.Canvas.Size.Value = new float2(CANVAS_WIDTH_DEFAULT, CANVAS_HEIGHT_DEFAULT);
 				return;
 
@@ -256,7 +253,7 @@ namespace SyncMemberManipulator
 				WizardStaticContentSlot.RemoveAllComponents((Component c) => c != WizardStaticContentRect);
 
 				searchRoot = WizardSearchDataSlot.FindChildOrAdd("searchRoot").GetComponentOrAttach<ReferenceField<Slot>>();
-				searchRoot.Reference.Target = WizardSlot.World.RootSlot;
+				//searchRoot.Reference.Target = WizardSlot.World.RootSlot;
 				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
 
 				VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
@@ -278,15 +275,15 @@ namespace SyncMemberManipulator
 
 				VerticalLayout verticalLayout2 = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 				verticalLayout2.ForceExpandHeight.Value = false;
-				
+
 				WizardGeneratedContentSlot = WizardUI.Root;
-				WizardGeneratedContentRect = WizardUI.CurrentRect;
+				//WizardGeneratedContentRect = WizardUI.CurrentRect;
 
 				WizardUI.PopStyle();
 
-				sourceComponent.Reference.Changed += (reference) => 
+				sourceComponent.Reference.Changed += (reference) =>
 				{
-					WizardGeneratedFieldsDataSlot.DestroyChildren();
+					//WizardGeneratedFieldsDataSlot.DestroyChildren();
 					WizardGeneratedContentSlot.DestroyChildren();
 					//WizardUI.ForceNext = WizardGeneratedFieldsRect;
 					WizardUI.NestInto(WizardGeneratedContentSlot);
@@ -311,15 +308,15 @@ namespace SyncMemberManipulator
 						VerticalLayout fieldsVerticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 						fieldsVerticalLayout.ForceExpandHeight.Value = false;
 
-						WizardGeneratedFieldsSlot = WizardUI.Root;
-						WizardGeneratedFieldsRect = WizardUI.CurrentRect;
+						//WizardGeneratedFieldsSlot = WizardUI.Root;
+						//WizardGeneratedFieldsRect = WizardUI.CurrentRect;
 
 						WizardUI.PopStyle();
 
 						WizardUI.Text("Component Fields");
 						//WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
 						WizardUI.Spacer(24f);
-						WizardUI.Button("Select All").LocalPressed += (btn, data) => 
+						WizardUI.Button("Select All").LocalPressed += (btn, data) =>
 						{
 							SetEnabledFields(true);
 						};
@@ -351,11 +348,18 @@ namespace SyncMemberManipulator
 						WizardUI.NestOut(); // Out of ScrollArea slot, Into WizardGeneratedContentSlot
 
 						WizardUI.Spacer(24f);
-						WizardUI.Button("Copy to Hierarchy (Undoable)").LocalPressed += (btn, data) => 
+
+						var applyButton = WizardUI.Button("Copy to Hierarchy (Undoable)");
+						applyButton.LocalPressed += (btn, data) =>
 						{
 							Msg("Apply pressed");
 							Apply();
 						};
+
+						//var referenceEqualityDriver = WizardUI.Current.AttachComponent<ReferenceEqualityDriver<Slot>>();
+						//referenceEqualityDriver.TargetReference.Target = searchRoot.Reference;
+						//referenceEqualityDriver.Target.Target = applyButton.EnabledField;
+						//referenceEqualityDriver.Invert.Value = true;
 
 						WizardUI.Spacer(24f);
 					}
@@ -374,7 +378,7 @@ namespace SyncMemberManipulator
 				foreach (ISyncMember syncMember in worker.SyncMembers)
 				{
 					Msg("syncMember Name: " + syncMember.Name);
-					
+
 					if (syncMember is SyncObject)
 					{
 						Msg("Is SyncObject");
@@ -413,7 +417,7 @@ namespace SyncMemberManipulator
 				// it could be an empty undo batch if there are no matching components?
 				WizardSlot.World.BeginUndoBatch("Set component fields");
 
-				foreach(Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) => 
+				foreach (Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) =>
 					c.GetType() == sourceComponent.Reference.Target.GetType() && c != sourceComponent.Reference.Target))
 				{
 					Msg(c.Name);
