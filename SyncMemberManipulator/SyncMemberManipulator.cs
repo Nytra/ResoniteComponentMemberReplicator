@@ -14,7 +14,7 @@ namespace SyncMemberManipulator
 {
 	public class SyncMemberManipulatorMod : ResoniteMod
 	{
-		public override string Name => "ComponentFieldReplicator";
+		public override string Name => "ComponentMemberReplicator";
 		public override string Author => "Nytra";
 		public override string Version => "1.0.0";
 		public override string Link => "https://github.com/Nytra/ResoniteSyncMemberManipulator";
@@ -67,13 +67,16 @@ namespace SyncMemberManipulator
 		[AutoRegisterConfigKey]
 		static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
 
+		//[AutoRegisterConfigKey]
+		//static ModConfigurationKey<bool> Key_HandleLists = new ModConfigurationKey<bool>("Key_HandleLists", "Key_HandleLists", () => false);
+
 		static ModConfiguration config;
 
 		static string WIZARD_TITLE
 		{
 			get
 			{
-				string s = "Component Field Replicator (Mod)";
+				string s = "Component Member Replicator (Mod)";
 				s += " " + HotReloader.GetReloadedCountOfModType(typeof(SyncMemberManipulatorMod)).ToString();
 				return s;
 			}
@@ -204,7 +207,8 @@ namespace SyncMemberManipulator
 			//			}
 			//		}
 			//	}
-			//	if (applyButton != null && !applyButton.IsRemoved)
+			//	Button applyButton = null;
+			//	if (applyButton.FilterWorldElement() != null)
 			//	{
 			//		applyButton.Enabled = b && searchRoot.Reference.Target != null;
 			//	}
@@ -264,6 +268,9 @@ namespace SyncMemberManipulator
 
 				WizardUI.Spacer(24f);
 
+				WizardUI.Text("<color=hero.red>WARNING: This may cause damage to your world. Proceed with care!</color>");
+				WizardUI.Spacer(24f);
+
 				WizardUI.PushStyle();
 
 				WizardUI.Style.MinWidth = -1f;
@@ -313,9 +320,8 @@ namespace SyncMemberManipulator
 
 						WizardUI.PopStyle();
 
-						WizardUI.Text("Component Fields");
-						//WizardUI.Text("Changes made here will only be applied after clicking the apply button!");
-						WizardUI.Spacer(24f);
+						//WizardUI.Text("Component Members");
+						//WizardUI.Spacer(24f);
 						WizardUI.Button("Select All").LocalPressed += (btn, data) =>
 						{
 							SetEnabledFields(true);
@@ -352,7 +358,7 @@ namespace SyncMemberManipulator
 						var applyButton = WizardUI.Button("Copy to Hierarchy (Undoable)");
 						applyButton.LocalPressed += (btn, data) =>
 						{
-							Msg("Apply pressed");
+							Debug("Apply pressed");
 							Apply();
 						};
 
@@ -368,6 +374,23 @@ namespace SyncMemberManipulator
 				UpdateCanvasSize();
 			}
 
+			//private void HandleField(Worker worker, ISyncMember syncMember)
+			//{
+			//	if (!workerMemberFields[worker.Name].ContainsKey(syncMember.Name))
+			//	{
+			//		Warn("syncMember not in dictionary. Skipping.");
+			//		return;
+			//	}
+			//	//Msg("Is field");
+			//	//IField field = ((IField)syncMember);
+			//	//SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
+			//	//if (fieldsStruct.enabledField.Value == false) return;
+			//	//IField sourceMember = (IField)fieldsStruct.sourceSyncMember;
+			//	//field.CreateUndoPoint();
+
+			//	//field.BoxedValue = sourceMember.BoxedValue;
+			//}
+
 			private void HandleWorker(Worker worker)
 			{
 				if (!workerMemberFields.ContainsKey(worker.Name))
@@ -377,11 +400,11 @@ namespace SyncMemberManipulator
 				}
 				foreach (ISyncMember syncMember in worker.SyncMembers)
 				{
-					Msg("syncMember Name: " + syncMember.Name);
+					Debug("syncMember Name: " + syncMember.Name);
 
 					if (syncMember is SyncObject)
 					{
-						Msg("Is SyncObject");
+						Debug("Is SyncObject");
 						HandleWorker((Worker)syncMember);
 					}
 					else if (syncMember is IField)
@@ -389,21 +412,72 @@ namespace SyncMemberManipulator
 						if (!workerMemberFields[worker.Name].ContainsKey(syncMember.Name))
 						{
 							Warn("syncMember not in dictionary. Skipping.");
-							continue;
+							return;
 						}
-						// assume its a field because thats all that is supported here right now
-						Msg("Is field");
-						IField field = ((IField)syncMember);
+
+						Debug("Is IField");
+
 						SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
 						if (fieldsStruct.enabledField.Value == false) continue;
-						field.CreateUndoPoint();
-						IField sourceMember = (IField)fieldsStruct.sourceSyncMember;
-						field.BoxedValue = sourceMember.BoxedValue;
+
+						ISyncMember sourceMember = fieldsStruct.sourceSyncMember;
+
+						IField targetField = ((IField)syncMember);
+						targetField.CreateUndoPoint();
+
+						syncMember.CopyValues(sourceMember);
+					}
+					else if (syncMember is SyncElement)
+					{
+						if (!workerMemberFields[worker.Name].ContainsKey(syncMember.Name))
+						{
+							Warn("syncMember not in dictionary. Skipping.");
+							continue;
+						}
+
+						SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
+						if (fieldsStruct.enabledField.Value == false) continue;
+
+						Debug("Is SyncElement");
+
+						ISyncMember sourceMember = fieldsStruct.sourceSyncMember;
+
+						syncMember.CopyValues(sourceMember);
+
+						//ISyncList list = (ISyncList)syncMember;
+						//ISyncList sourceList = (ISyncList)fieldsStruct.sourceSyncMember;
+
+						//int countCopy = list.Count;
+						//for (int i = 0; i < countCopy; i++)
+						//{
+						//	list.RemoveElement(0);
+						//}
+
+						//for (int i = 0; i < sourceList.Count; i++)
+						//{
+						//	list.AddElement();
+						//}
+
+						//int x = 0;
+						//foreach (var targetSyncMember in list.Elements)
+						//{
+						//	if (targetSyncMember is SyncObject)
+						//	{
+						//		Debug("List element is SyncObject");
+						//		((SyncObject)targetSyncMember).CopyValues(sourceList.GetElement(x));
+						//	}
+						//	else if (targetSyncMember is IField)
+						//	{
+						//		Debug("List element is IField");
+						//		// doesn't make sense to make a undo step here since the element just got added
+						//		HandleField(sourceList.GetElement(x), (ISyncMember)targetSyncMember, undo: false);
+						//	}
+						//	x++;
+						//}
 					}
 					else
 					{
-						// lists etc unsupported for now
-						Msg("syncMember is not supported type: " + syncMember.GetType().Name);
+						Debug("syncMember is not supported type: " + syncMember.GetType().Name ?? "NULL");
 					}
 				}
 			}
@@ -415,12 +489,12 @@ namespace SyncMemberManipulator
 				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
 				// it could be an empty undo batch if there are no matching components?
-				WizardSlot.World.BeginUndoBatch("Set component fields");
+				WizardSlot.World.BeginUndoBatch("Set component members");
 
 				foreach (Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) =>
 					c.GetType() == sourceComponent.Reference.Target.GetType() && c != sourceComponent.Reference.Target))
 				{
-					Msg(c.Name);
+					Debug(c.Name);
 					HandleWorker(c);
 				}
 
@@ -487,7 +561,14 @@ namespace SyncMemberManipulator
 						}
 						continue;
 					}
-					else if (!(syncMember is IField))
+					//else if (syncMember is ISyncList && config.GetValue(Key_HandleLists))
+					//{
+					//	Debug("Is ISyncList");
+					//	Debug(syncMember.Name ?? "NULL");
+					//	Debug(syncMember.GetType().ToString() ?? "NULL");
+					//	Debug(syncMember.GetType().GetGenericArguments()[0].ToString() ?? "NULL");
+					//}
+					else if (!(syncMember is SyncElement))
 					{
 						UI.PushStyle();
 						UI.Style.PreferredHeight = 24f;
@@ -537,7 +618,15 @@ namespace SyncMemberManipulator
 
 					UI.PushStyle();
 					UI.Style.PreferredHeight = 24f;
-					UI.Text($"{syncMember.Name}").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+					if (!(syncMember is IField) && syncMember is SyncElement)
+					{
+						//UI.Text($"{syncMember.GetType().GetGenericTypeDefinition().Name ?? syncMember.GetType().GetNiceName()} {syncMember.Name} (not undoable)").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+						UI.Text($"{syncMember.Name} <color=hero.red>(not undoable)</color>").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+					}
+					else
+					{
+						UI.Text($"{syncMember.Name}").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+					}
 					UI.PopStyle();
 
 					//UI.MemberEditor((IField)syncMember, )
