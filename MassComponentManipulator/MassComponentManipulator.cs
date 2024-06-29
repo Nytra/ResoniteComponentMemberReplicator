@@ -506,6 +506,7 @@ namespace MassComponentManipulator
 				var rootWorker = root;
 				Debug($"Finding corresponding member for source member {memberToFind.Name} of type {memberToFind.GetType().Name} on root worker {root.Name}");
 				Debug($"Current stack: {string.Join(",", pathToMemberToFind.Select(x => x.Name))}");
+				var syncElementListType = typeof(SyncElementList<>).MakeGenericType(memberToFind.GetType());
 				while (pathToMemberToFind.Count > 0)
 				{
 					var member = pathToMemberToFind.Pop();
@@ -520,7 +521,7 @@ namespace MassComponentManipulator
 					{
 						Debug($"Found list: {list.Name}");
 						var genericArg = list.GetType().GetGenericArguments()[0];
-						if (genericArg == memberToFind.GetType())
+						if (syncElementListType.IsAssignableFrom(list.GetType()))
 						{
 							foreach (var elem in list.Elements)
 							{
@@ -856,6 +857,7 @@ namespace MassComponentManipulator
 						SyncMemberData fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
 						if (fieldsStruct.enabledField.Value == false) continue;
 
+						Debug("syncMember Name: " + syncMember.Name);
 						Debug("Is SyncElement");
 
 						ISyncMember sourceMember = fieldsStruct.sourceSyncMember;
@@ -885,7 +887,7 @@ namespace MassComponentManipulator
 							}
 							foreach (var driveData in allDriveData)
 							{
-								var correspondingMember = FindCorrespondingMember(sourceList.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
+								var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
 								if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
 								{
 									Debug("Restored drive.");
@@ -918,7 +920,7 @@ namespace MassComponentManipulator
 							}
 							foreach (var driveData in allDriveData)
 							{
-								var correspondingMember = FindCorrespondingMember(sourceBag.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
+								var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
 								if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
 								{
 									Debug("Restored drive.");
