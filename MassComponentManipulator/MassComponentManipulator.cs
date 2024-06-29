@@ -8,9 +8,10 @@ using ResoniteHotReloadLib;
 using ResoniteModLoader;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
-namespace SyncMemberManipulator
+namespace MassComponentManipulator
 {
 	public class SyncMemberManipulatorMod : ResoniteMod
 	{
@@ -108,7 +109,7 @@ namespace SyncMemberManipulator
 		{
 			//DateTime utcNow = DateTime.UtcNow;
 			//wizardActionString = WIZARD_TITLE + utcNow.ToString();
-			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => SyncMemberManipulator.CreateWizard(slot));
+			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => MassComponentManipulator.CreateWizard(slot));
 		}
 
 		static void Setup()
@@ -116,11 +117,11 @@ namespace SyncMemberManipulator
 			AddMenuOption();
 		}
 
-		public class SyncMemberManipulator
+		public class MassComponentManipulator
 		{
-			public static SyncMemberManipulator CreateWizard(Slot x)
+			public static MassComponentManipulator CreateWizard(Slot x)
 			{
-				return new SyncMemberManipulator(x);
+				return new MassComponentManipulator(x);
 			}
 
 			Slot WizardSlot;
@@ -137,21 +138,30 @@ namespace SyncMemberManipulator
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> sourceComponent;
 
+			ValueField<bool> restoreDrivesRecursively;
+
+			static Dictionary<Component, Component> newCompMappings = new Dictionary<Component, Component>();
+
 			//Button applyButton;
 
-			struct SyncMemberWizardFields
+			struct SyncMemberData
 			{
 				public ISyncMember sourceSyncMember; // the syncMember to copy from
 				public IField<bool> enabledField; // the checkbox that determines if the syncMember should be copied out to other components
 			}
 
+			// workers with same name?
+			// syncMembers with same name?
+			// should check syncMemberIndex
+
 			// <workerName, <memberName, SyncMemberWizardFields>>
-			Dictionary<string, Dictionary<string, SyncMemberWizardFields>> workerMemberFields = new Dictionary<string, Dictionary<string, SyncMemberWizardFields>>();
+			// could break if there are nested workers? or workers with same name?
+			Dictionary<string, Dictionary<string, SyncMemberData>> workerMemberFields = new Dictionary<string, Dictionary<string, SyncMemberData>>();
 
 			const float CANVAS_WIDTH_DEFAULT = 800f; // 800f
 			const float CANVAS_HEIGHT_DEFAULT = 1200f;
 
-			SyncMemberManipulator(Slot x)
+			MassComponentManipulator(Slot x)
 			{
 				WizardSlot = x;
 				WizardSlot.Tag = "Developer";
@@ -184,9 +194,9 @@ namespace SyncMemberManipulator
 
 			void SetEnabledFields(bool val)
 			{
-				foreach (Dictionary<string, SyncMemberWizardFields> dict in workerMemberFields.Values)
+				foreach (Dictionary<string, SyncMemberData> dict in workerMemberFields.Values)
 				{
-					foreach (SyncMemberWizardFields fields in dict.Values)
+					foreach (SyncMemberData fields in dict.Values)
 					{
 						fields.enabledField.Value = val;
 					}
@@ -248,6 +258,350 @@ namespace SyncMemberManipulator
 				//});
 			}
 
+			IEnumerable<ISyncMember> EnumerateMembersRecursively(Worker rootWorker)
+			{
+				//Debug($"Root worker: {rootWorker.Name}");
+				foreach (var member in rootWorker.SyncMembers)
+				{
+					//Debug(member.Name);
+					yield return member;
+					if (member is Worker nextWorker)
+					{
+						foreach (var nextWorkerMember in EnumerateMembersRecursively(nextWorker))
+						{
+							yield return nextWorkerMember;
+						}
+					}
+					else if (member is ISyncList list)
+					{
+						//Debug($"Found list: {list.Name}");
+						var genericArg = list.GetType().GetGenericArguments()[0];
+						if (typeof(Worker).IsAssignableFrom(genericArg))
+						{
+							// Need to do recursion here probably
+							//Debug("List of workers");
+							foreach (var elem in list.Elements)
+							{
+								foreach (var listMember in EnumerateMembersRecursively((Worker)elem))
+								{
+									yield return listMember;
+								}
+							}
+							break;
+						}
+						else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
+						{
+							foreach (var elem in list.Elements)
+							{
+								yield return (ISyncMember)elem;
+							}
+							break;
+						}
+					}
+					else if (member is ISyncBag bag)
+					{
+						//Debug($"Found bag: {bag.Name}");
+						var genericArg = bag.GetType().GetGenericArguments()[0];
+						if (typeof(Worker).IsAssignableFrom(genericArg))
+						{
+							// Need to do recursion here probably
+							//Debug("Bag of workers");
+							foreach (var elem in bag.Values)
+							{
+								foreach (var bagMember in EnumerateMembersRecursively((Worker)elem))
+								{
+									yield return bagMember;
+								}
+							}
+							break;
+						}
+						else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
+						{
+							foreach (var elem in bag.Values)
+							{
+								yield return (ISyncMember)elem;
+							}
+							break;
+						}
+					}
+				}
+			}
+
+			class DriveData
+			{
+				public Stack<ISyncMember> stackToDrivenMember;
+				public ISyncMember drivenMember = null;
+			}
+
+			Stack<ISyncMember> GetMemberStack(ISyncMember member)
+			{
+				var stack = new Stack<ISyncMember>();
+				bool found = false;
+				var currentMember = member;
+				while (!found)
+				{
+					stack.Push(currentMember);
+					if (currentMember.Parent is ISyncMember parentMember)
+					{
+						currentMember = parentMember;
+					}
+					else
+					{
+						found = true;
+					}
+				}
+				return stack;
+			}
+
+			//void RestoreAllDrives(Worker fromWorker, Worker toWorker, bool undoable = false)
+			//{
+			//	var allDriveData = new List<DriveData>();
+			//	foreach (var member in EnumerateMembersRecursively(fromWorker))
+			//	{
+			//		if (member.IsDriven)
+			//		{
+			//			var driveData = new DriveData();
+			//			driveData.drivenMember = member;
+			//			driveData.stackToDrivenMember = GetMemberStack(member);
+			//		}
+			//	}
+
+			//	foreach (var driveData in allDriveData)
+			//	{
+			//		ISyncMember memberToRestore = FindCorrespondingMember(toWorker, driveData.drivenMember, driveData.stackToDrivenMember);
+
+			//		if (memberToRestore != null && memberToRestore.Name == driveData.drivenMember.Name && memberToRestore.GetType() == driveData.drivenMember.GetType())
+			//		{
+			//			var syncRef = (ISyncRef)memberToRestore;
+			//			syncRef.Target = driveData.drivenMember;
+			//		}
+			//	}
+			//}
+
+			void CollectDriveData(Worker worker, List<DriveData> allDriveData)
+			{
+				foreach (var member in EnumerateMembersRecursively(worker))
+				{
+					if (member is IField && member.IsDriven)
+					{
+						Debug($"Found driven member: {member.Name}");
+						var driveData = new DriveData();
+						driveData.drivenMember = member;
+						driveData.stackToDrivenMember = GetMemberStack(member);
+						allDriveData.Add(driveData);
+					}
+				}
+			}
+
+			bool RestoreDrive(IField fromField, IField toField, Dictionary<Component, Component> newCompMappings, bool undoable = false, bool recursive = false)
+			{
+				var link = fromField.ActiveLink;
+				var comp = link.FindNearestParent<Component>();
+				var targetSlot = toField.FindNearestParent<Slot>();
+
+				var toFieldComponent = toField.FindNearestParent<Component>();
+				Debug($"Restoring drive for field {toField.Name} on component {toFieldComponent.Name} on slot {toFieldComponent.Slot.Name}");
+
+				Component newComp;
+				if (newCompMappings.TryGetValue(comp, out var existingComp))
+				{
+					newComp = existingComp;
+					Debug($"Found existing component mapping for {comp.Name} {comp.ReferenceID}");
+				}
+				else
+				{
+					// It breaks the original drive if I don't set breakExternalReferences to true
+					newComp = targetSlot.DuplicateComponent(comp, breakExternalReferences: true);
+					newCompMappings.Add(comp, newComp);
+					Debug($"Duplicated new component, added component mapping for: {comp.Name} {comp.ReferenceID}");
+				}
+
+				Debug($"Restored component: {newComp.Name} {newComp.ReferenceID}");
+
+				if (undoable)
+				{
+					if (toField.ValueType.IsEnginePrimitive() || toField.ValueType == typeof(RefID) || toField.ValueType == typeof(Type))
+					{
+						toField.CreateUndoPoint();
+					}
+					newComp.CreateSpawnUndoPoint();
+				}
+
+				var pathToLink = GetMemberStack(link);
+
+				//var pathToLink = new Stack<ISyncMember>();
+				//var currentMember = link as ISyncMember;
+
+				//bool found = false;
+				//while (!found)
+				//{
+				//	pathToLink.Push(currentMember);
+				//	if (currentMember.Parent is ISyncMember parentMember)
+				//	{
+				//		currentMember = parentMember;
+				//	}
+				//	else
+				//	{
+				//		found = true;
+				//	}
+				//}
+
+				
+
+				//return false;
+
+				if (recursive)
+				{
+					var allDriveData = new List<DriveData>();
+					CollectDriveData(comp, allDriveData);
+					//foreach (var member in EnumerateMembersRecursively(comp))
+					//{
+					//	if (member is IField && member.IsDriven)
+					//	{
+					//		Debug($"Found driven member: {member.Name}");
+					//		var driveData = new DriveData();
+					//		driveData.drivenMember = member;
+					//		driveData.stackToDrivenMember = GetMemberStack(member);
+					//		allDriveData.Add(driveData);
+					//	}
+					//}
+					foreach (var driveData in allDriveData)
+					{
+						var correspondingMember = FindCorrespondingMember(newComp, driveData.drivenMember, driveData.stackToDrivenMember);
+						if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: recursive))
+						{
+							Debug("Restored drive.");
+						}
+						else
+						{
+							Debug("Failed to restore drive.");
+						}
+					}
+
+					ISyncMember foundMember = FindCorrespondingMember(newComp, link, pathToLink);
+
+					if (foundMember != null && foundMember.Name == link.Name && foundMember.GetType() == link.GetType())
+					{
+						var syncRef = (ISyncRef)foundMember;
+						syncRef.Target = toField;
+						return true;
+					}
+				}
+				else
+				{
+					ISyncMember foundMember = FindCorrespondingMember(newComp, link, pathToLink);
+
+					if (foundMember != null && foundMember.Name == link.Name && foundMember.GetType() == link.GetType())
+					{
+						var syncRef = (ISyncRef)foundMember;
+						syncRef.Target = toField;
+						return true;
+					}
+				}
+				return false;
+			}
+
+			ISyncMember FindCorrespondingMember(Worker root, ISyncMember memberToFind, Stack<ISyncMember> pathToMemberToFind)
+			{
+				var rootWorker = root;
+				Debug($"Finding corresponding member for source member {memberToFind.Name} of type {memberToFind.GetType().Name} on root worker {root.Name}");
+				Debug($"Current stack: {string.Join(",", pathToMemberToFind.Select(x => x.Name))}");
+				while (pathToMemberToFind.Count > 0)
+				{
+					var member = pathToMemberToFind.Pop();
+					Debug($"Looking for member: {member.Name}");
+					var correspondingMember = rootWorker.GetSyncMember(member.Name);
+					if (correspondingMember is Worker nextWorker)
+					{
+						Debug($"Found next worker: {nextWorker.Name}");
+						rootWorker = nextWorker;
+					}
+					else if (correspondingMember is ISyncList list)
+					{
+						Debug($"Found list: {list.Name}");
+						var genericArg = list.GetType().GetGenericArguments()[0];
+						if (genericArg == memberToFind.GetType())
+						{
+							foreach (var elem in list.Elements)
+							{
+								if (elem is ISyncMember listMember && listMember.Name == memberToFind.Name)
+								{
+									Debug($"Found corresponding list member: {listMember.Name}");
+									return listMember;
+								}
+							}
+						}
+						else if (typeof(Worker).IsAssignableFrom(genericArg))
+						{
+							// Need to do recursion here probably
+							Debug("List of workers");
+							var listWorkerName = pathToMemberToFind.Pop().Name;
+							foreach (var elem in list.Elements)
+							{
+								var listWorker = (Worker)elem;
+								if (listWorker.Name == listWorkerName)
+								{
+									//var clonedStack = new Stack<ISyncMember>(pathToMemberToFind.Reverse());
+									var result = FindCorrespondingMember((Worker)elem, memberToFind, pathToMemberToFind);
+									if (result != null)
+									{
+										//Debug($"Found corresponding member: {result.Name}");
+										return result;
+									}
+									break;
+								}
+							}
+							break;
+						}
+					}
+					else if (correspondingMember is ISyncBag bag)
+					{
+						Debug($"Found bag: {bag.Name}");
+						var genericArg = bag.GetType().GetGenericArguments()[0];
+						if (genericArg == memberToFind.GetType())
+						{
+							foreach (var elem in bag.Values)
+							{
+								if (elem is ISyncMember bagMember && bagMember.Name == memberToFind.Name)
+								{
+									Debug($"Found corresponding bag member: {bagMember.Name}");
+									return bagMember;
+								}
+							}
+						}
+						else if (typeof(Worker).IsAssignableFrom(genericArg))
+						{
+							// Need to do recursion here probably
+							Debug("Bag of workers");
+							var bagWorkerName = pathToMemberToFind.Pop().Name;
+							foreach (var elem in bag.Values)
+							{
+								var bagWorker = (Worker)elem;
+								if (bagWorker.Name == bagWorkerName)
+								{
+									//var clonedStack = new Stack<ISyncMember>(pathToMemberToFind.Reverse());
+									var result = FindCorrespondingMember((Worker)elem, memberToFind, pathToMemberToFind);
+									if (result != null)
+									{
+										//Debug($"Found corresponding member: {result.Name}");
+										return result;
+									}
+									break;
+								}
+							}
+							break;
+						}
+					}
+					else
+					{
+						Debug($"Found corresponding member: {correspondingMember.Name}");
+						return correspondingMember;
+					}
+				}
+				Debug("Failed. Returning null");
+				return null;
+			}
+
 			void RegenerateWizardUI()
 			{
 				WizardSearchDataSlot.DestroyChildren();
@@ -260,15 +614,18 @@ namespace SyncMemberManipulator
 				//searchRoot.Reference.Target = WizardSlot.World.RootSlot;
 				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
 
+				restoreDrivesRecursively = WizardSearchDataSlot.FindChildOrAdd("restoreDrivesRecursively").GetComponentOrAttach<ValueField<bool>>();
+
 				VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 				verticalLayout.ForceExpandHeight.Value = false;
 
-				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Hierarchy Root Slot", null, WizardUI);
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
+				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Hierarchy Root Slot", null, WizardUI);
+				SyncMemberEditorBuilder.Build(restoreDrivesRecursively.Value, "Restore Drives Recursively", null, WizardUI);
 
 				WizardUI.Spacer(24f);
 
-				WizardUI.Text("<color=hero.red>WARNING: This may cause damage to your world. Proceed with care!</color>");
+				WizardUI.Text("<color=hero.red>WARNING: This may cause irreversible changes. Proceed with care!</color>");
 				WizardUI.Spacer(24f);
 
 				WizardUI.PushStyle();
@@ -297,6 +654,20 @@ namespace SyncMemberManipulator
 					//WizardGeneratedFieldsSlot.RemoveAllComponents((Component c) => c != WizardGeneratedFieldsRect);
 					if (((ISyncRef)reference).Target != null)
 					{
+
+						//WizardUI.Text("Component Members");
+						//WizardUI.Spacer(24f);
+						WizardUI.Button("Select All").LocalPressed += (btn, data) =>
+						{
+							SetEnabledFields(true);
+						};
+						WizardUI.Button("Deselect All").LocalPressed += (btn, data) =>
+						{
+							SetEnabledFields(false);
+						};
+
+						WizardUI.Spacer(24f);
+
 						WizardUI.PushStyle();
 
 						WizardUI.Style.MinWidth = -1f;
@@ -320,18 +691,9 @@ namespace SyncMemberManipulator
 
 						WizardUI.PopStyle();
 
-						//WizardUI.Text("Component Members");
-						//WizardUI.Spacer(24f);
-						WizardUI.Button("Select All").LocalPressed += (btn, data) =>
-						{
-							SetEnabledFields(true);
-						};
-						WizardUI.Button("Deselect All").LocalPressed += (btn, data) =>
-						{
-							SetEnabledFields(false);
-						};
+						
 
-						WizardUI.Spacer(24f);
+						// here!
 
 						WizardUI.PushStyle();
 
@@ -400,10 +762,11 @@ namespace SyncMemberManipulator
 				}
 				foreach (ISyncMember syncMember in worker.SyncMembers)
 				{
-					Debug("syncMember Name: " + syncMember.Name);
+					//Debug("syncMember Name: " + syncMember.Name);
 
 					if (syncMember is SyncObject)
 					{
+						Debug("syncMember Name: " + syncMember.Name);
 						Debug("Is SyncObject");
 						HandleWorker((Worker)syncMember);
 					}
@@ -415,17 +778,72 @@ namespace SyncMemberManipulator
 							return;
 						}
 
+						Debug("syncMember Name: " + syncMember.Name);
 						Debug("Is IField");
 
-						SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
+						SyncMemberData fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
 						if (fieldsStruct.enabledField.Value == false) continue;
 
 						ISyncMember sourceMember = fieldsStruct.sourceSyncMember;
 
-						IField targetField = ((IField)syncMember);
-						targetField.CreateUndoPoint();
+						// copy drives
+						var sourceField = (IField)sourceMember;
+						if (sourceField.IsDriven)
+						{
+							Debug("Is Driven");
+							//var link = field.ActiveLink;
+							//var comp = link.FindNearestParent<Component>();
+							//var targetSlot = syncMember.FindNearestParent<Slot>();
 
-						syncMember.CopyValues(sourceMember);
+							//// It breaks the original drive if I don't set breakExternalReferences to true
+							//var newComp = targetSlot.DuplicateComponent(comp, breakExternalReferences: true);
+
+							//((IField)syncMember).CreateUndoPoint();
+							//newComp.CreateSpawnUndoPoint();
+
+							//var pathToLink = new Stack<ISyncMember>();
+							//var currentMember = link as ISyncMember;
+
+							//bool found = false;
+							//while (!found)
+							//{
+							//	pathToLink.Push(currentMember);
+							//	if (currentMember.Parent is ISyncMember parentMember)
+							//	{
+							//		currentMember = parentMember;
+							//	}
+							//	else
+							//	{
+							//		found = true;
+							//	}
+							//}
+
+							//ISyncMember foundMember = FindCorrespondingMember(newComp, link, pathToLink);
+
+							//if (foundMember != null && foundMember.Name == link.Name && foundMember.GetType() == link.GetType())
+							//{
+							//	var syncRef = (ISyncRef)foundMember;
+							//	syncRef.Target = syncMember;
+							//}
+
+							if (RestoreDrive(sourceField, (IField)syncMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
+							{
+								Debug("Restored drive.");
+							}
+							else
+							{
+								Debug("Failed to restore drive.");
+							}
+						}
+						else
+						{
+							var targetField = (IField)syncMember;
+							if (targetField.ValueType.IsEnginePrimitive() || targetField.ValueType == typeof(RefID) || targetField.ValueType == typeof(Type))
+							{
+								targetField.CreateUndoPoint();
+							}
+							syncMember.CopyValues(sourceMember);
+						}
 					}
 					else if (syncMember is SyncElement)
 					{
@@ -435,7 +853,7 @@ namespace SyncMemberManipulator
 							continue;
 						}
 
-						SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
+						SyncMemberData fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
 						if (fieldsStruct.enabledField.Value == false) continue;
 
 						Debug("Is SyncElement");
@@ -443,6 +861,74 @@ namespace SyncMemberManipulator
 						ISyncMember sourceMember = fieldsStruct.sourceSyncMember;
 
 						syncMember.CopyValues(sourceMember);
+
+						// Restore drives to list and bag elements
+						if (sourceMember is ISyncList sourceList)
+						{
+							var allDriveData = new List<DriveData>();
+							foreach (var elem in sourceList.Elements)
+							{
+								if (elem is IField listField)
+								{
+									if (listField.IsDriven)
+									{
+										var driveData = new DriveData();
+										driveData.drivenMember = listField;
+										driveData.stackToDrivenMember = GetMemberStack(listField);
+										allDriveData.Add(driveData);
+									}
+								}
+								else if (elem is Worker listWorker)
+								{
+									CollectDriveData(listWorker, allDriveData);
+								}
+							}
+							foreach (var driveData in allDriveData)
+							{
+								var correspondingMember = FindCorrespondingMember(sourceList.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
+								if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
+								{
+									Debug("Restored drive.");
+								}
+								else
+								{
+									Debug("Failed to restore drive.");
+								}
+							}
+						}
+						else if (sourceMember is ISyncBag sourceBag)
+						{
+							var allDriveData = new List<DriveData>();
+							foreach (var elem in sourceBag.Values)
+							{
+								if (elem is IField listField)
+								{
+									if (listField.IsDriven)
+									{
+										var driveData = new DriveData();
+										driveData.drivenMember = listField;
+										driveData.stackToDrivenMember = GetMemberStack(listField);
+										allDriveData.Add(driveData);
+									}
+								}
+								else if (elem is Worker listWorker)
+								{
+									CollectDriveData(listWorker, allDriveData);
+								}
+							}
+							foreach (var driveData in allDriveData)
+							{
+								var correspondingMember = FindCorrespondingMember(sourceBag.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
+								if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
+								{
+									Debug("Restored drive.");
+								}
+								else
+								{
+									Debug("Failed to restore drive.");
+								}
+							}
+						}
 
 						//ISyncList list = (ISyncList)syncMember;
 						//ISyncList sourceList = (ISyncList)fieldsStruct.sourceSyncMember;
@@ -489,6 +975,7 @@ namespace SyncMemberManipulator
 				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
 				// it could be an empty undo batch if there are no matching components?
+				newCompMappings.Clear();
 				WizardSlot.World.BeginUndoBatch("Set component members");
 
 				foreach (Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) =>
@@ -503,7 +990,7 @@ namespace SyncMemberManipulator
 
 			void GenerateWorkerMemberEditors(UIBuilder UI, Worker targetWorker, bool recursive = true)
 			{
-				workerMemberFields.Add(targetWorker.Name, new Dictionary<string, SyncMemberWizardFields>());
+				workerMemberFields.Add(targetWorker.Name, new Dictionary<string, SyncMemberData>());
 
 				int i = -1;
 				foreach (ISyncMember syncMember in targetWorker.SyncMembers)
@@ -631,7 +1118,7 @@ namespace SyncMemberManipulator
 
 					//UI.MemberEditor((IField)syncMember, )
 
-					SyncMemberWizardFields fieldsStruct = new SyncMemberWizardFields();
+					SyncMemberData fieldsStruct = new SyncMemberData();
 					fieldsStruct.sourceSyncMember = syncMember;
 					fieldsStruct.enabledField = checkbox.State;
 
