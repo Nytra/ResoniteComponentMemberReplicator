@@ -2,6 +2,7 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.ProtoFlux;
+using FrooxEngine.ProtoFlux.CoreNodes;
 using FrooxEngine.UIX;
 using FrooxEngine.Undo;
 using ResoniteHotReloadLib;
@@ -138,6 +139,7 @@ namespace MassComponentManipulator
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> sourceComponent;
 
+			ValueField<bool> restoreDrives;
 			ValueField<bool> restoreDrivesRecursively;
 
 			static Dictionary<Component, Component> newCompMappings = new Dictionary<Component, Component>();
@@ -258,11 +260,80 @@ namespace MassComponentManipulator
 				//});
 			}
 
+			IEnumerable<ISyncMember> EnumerateMembersRecursively(ISyncMember member)
+			{
+				if (member is Worker nextWorker)
+				{
+					foreach (var nextWorkerMember in EnumerateMembersRecursively(nextWorker))
+					{
+						yield return nextWorkerMember;
+					}
+				}
+				else if (member is ISyncList list)
+				{
+					//Debug($"Found list: {list.Name}");
+					var genericArg = list.GetType().GetGenericArguments()[0];
+					if (typeof(Worker).IsAssignableFrom(genericArg))
+					{
+						// Need to do recursion here probably
+						//Debug("List of workers");
+						foreach (var elem in list.Elements)
+						{
+							foreach (var listMember in EnumerateMembersRecursively((Worker)elem))
+							{
+								yield return listMember;
+							}
+						}
+						//break;
+					}
+					else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
+					{
+						foreach (var elem in list.Elements)
+						{
+							yield return (ISyncMember)elem;
+						}
+						//break;
+					}
+				}
+				else if (member is ISyncBag bag)
+				{
+					//Debug($"Found bag: {bag.Name}");
+					var genericArg = bag.GetType().GetGenericArguments()[0];
+					if (typeof(Worker).IsAssignableFrom(genericArg))
+					{
+						// Need to do recursion here probably
+						//Debug("Bag of workers");
+						foreach (var elem in bag.Values)
+						{
+							foreach (var bagMember in EnumerateMembersRecursively((Worker)elem))
+							{
+								yield return bagMember;
+							}
+						}
+						//break;
+					}
+					else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
+					{
+						foreach (var elem in bag.Values)
+						{
+							yield return (ISyncMember)elem;
+						}
+						//break;
+					}
+				}
+			}
+
 			IEnumerable<ISyncMember> EnumerateMembersRecursively(Worker rootWorker)
 			{
 				//Debug($"Root worker: {rootWorker.Name}");
 				foreach (var member in rootWorker.SyncMembers)
 				{
+					yield return member;
+					foreach (var allMember in EnumerateMembersRecursively(member))
+					{
+						yield return allMember;
+					}
+					continue;
 					//Debug(member.Name);
 					yield return member;
 					if (member is Worker nextWorker)
@@ -384,7 +455,7 @@ namespace MassComponentManipulator
 				{
 					if (member is IField && member.IsDriven)
 					{
-						Debug($"Found driven member: {member.Name}");
+						//Debug($"Found driven member: {ElementIdentifierString(member)}");
 						var driveData = new DriveData();
 						driveData.drivenMember = member;
 						driveData.stackToDrivenMember = GetMemberStack(member);
@@ -393,30 +464,152 @@ namespace MassComponentManipulator
 				}
 			}
 
+			string ElementIdentifierString(IWorldElement elem)
+			{
+				return $"{elem.Name} {elem.ReferenceID}";
+			}
+
 			bool RestoreDrive(IField fromField, IField toField, Dictionary<Component, Component> newCompMappings, bool undoable = false, bool recursive = false)
 			{
 				var link = fromField.ActiveLink;
 				var comp = link.FindNearestParent<Component>();
-				var targetSlot = toField.FindNearestParent<Slot>();
+				//var targetSlot = toField.FindNearestParent<Slot>();
 
 				var toFieldComponent = toField.FindNearestParent<Component>();
-				Debug($"Restoring drive for field {toField.Name} on component {toFieldComponent.Name} on slot {toFieldComponent.Slot.Name}");
+				var targetSlot = toFieldComponent.Slot;
+
+				Debug($"Restoring drive for field {ElementIdentifierString(toField)} on component {ElementIdentifierString(toFieldComponent)} on slot {ElementIdentifierString(targetSlot)}");
+
+				Debug($"Source field is driven by {ElementIdentifierString(link)} of type {link.GetType().GetNiceName()} on component {ElementIdentifierString(comp)}");
+
+				// support playbacks?
+				if (comp is ProtoFluxEngineProxy proxy && proxy.GetSyncMember("Drive") is ILinkRef proxyLinkRef && proxyLinkRef.Target != null && typeof(IField).IsAssignableFrom(proxyLinkRef.Target.GetType()))
+				{
+					Debug("Is ProtoFluxEngineProxy Drive");
+					//Debug("Using ValueCopy for ProtoFluxEngineProxy Target");
+					//toField.DriveFrom((IField)proxyLinkRef.Target);
+
+					//var dupedNode = comp.Slot.Duplicate();
+
+					if (proxy.Node.Target is null)
+					{
+						Debug("Proxy node target is null, skipping");
+						return false;
+					}
+
+					var newSlot = comp.Slot.Parent.AddSlot(comp.Slot.Name + "_duped");
+					var origDriveNode = proxy.Node.Target.FindNearestParent<Component>();
+					var dupedDriveNode = newSlot.DuplicateComponent(origDriveNode);
+					if (undoable)
+					{
+						dupedDriveNode.CreateSpawnUndoPoint();
+					}
+					if (recursive)
+					{
+						Debug("Entered recursive part.");
+
+						var allDriveData = new List<DriveData>();
+						CollectDriveData(origDriveNode, allDriveData);
+						foreach (var driveData in allDriveData)
+						{
+							Debug($"Found driven member on source component that needs to be restored: {ElementIdentifierString(driveData.drivenMember)}");
+							var correspondingMember = FindCorrespondingMember(dupedDriveNode, driveData.drivenMember, driveData.stackToDrivenMember);
+							if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive))
+							{
+								Debug("Restored drive.");
+							}
+							else
+							{
+								Debug("Failed to restore drive.");
+							}
+						}
+
+						Debug("Finished recursive part.");
+					}
+					if (dupedDriveNode is IDrive driveNode)
+					{
+						driveNode.TrySetRootTarget(toField);
+					}
+					//foreach (var nodeComp in comp.Slot.Components)
+					//{
+					//	if (nodeComp is ProtoFluxEngineProxy nodeCompProxy)	
+					//	{
+					//		//if (nodeCompProxy.Node.Target is IProtoFluxNode nodeCompProxyNodeTarget && nodeCompProxyNodeTarget.FindNearestParent<Slot>() == comp.Slot)
+					//		//{
+					//		//	continue;
+					//		//}
+					//		//else if (nodeComp == proxy)
+					//		//{
+					//		//	continue;
+					//		//}
+					//		continue;
+					//	}
+					//	var dupedComp = newSlot.DuplicateComponent(nodeComp, breakExternalReferences: true);
+					//	if (undoable)
+					//	{
+					//		dupedComp.CreateSpawnUndoPoint();
+					//	}
+					//	//here
+					//	if (recursive)
+					//	{
+					//		Debug("Entered recursive part.");
+
+					//		var allDriveData = new List<DriveData>();
+					//		CollectDriveData(nodeComp, allDriveData);
+					//		foreach (var driveData in allDriveData)
+					//		{
+					//			Debug($"Found driven member on source component that needs to be restored: {ElementIdentifierString(driveData.drivenMember)}");
+					//			var correspondingMember = FindCorrespondingMember(dupedComp, driveData.drivenMember, driveData.stackToDrivenMember);
+					//			if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive))
+					//			{
+					//				Debug("Restored drive.");
+					//			}
+					//			else
+					//			{
+					//				Debug("Failed to restore drive.");
+					//			}
+					//		}
+
+					//		Debug("Finished recursive part.");
+					//	}
+					//	if (dupedComp is IDrive driveNode && (IProtoFluxNode)nodeComp == proxy.Node.Target)
+					//	{
+					//		driveNode.TrySetRootTarget(toField);
+					//	}
+					//	//here end
+					//}
+
+					//var proxyLinkRefStack = GetMemberStack(proxyLinkRef);
+					//var correspondingProxyLinkRef = FindCorrespondingMember(dupedComp, proxyLinkRef, proxyLinkRefStack);
+					//if (correspondingProxyLinkRef != null && correspondingProxyLinkRef.Name == proxyLinkRef.Name && correspondingProxyLinkRef.GetType() == proxyLinkRef.GetType())
+					//{
+					//	var syncRef = (ISyncRef)correspondingProxyLinkRef;
+					//	syncRef.Target = toField;
+					//	//return true;
+					//}
+
+					Debug("ProtoFlux drive node restored.");
+
+					return true;
+				}
+
+				Debug($"Requires mapping for source component: {ElementIdentifierString(comp)}");
 
 				Component newComp;
+				bool newSpawn = false;
 				if (newCompMappings.TryGetValue(comp, out var existingComp))
 				{
 					newComp = existingComp;
-					Debug($"Found existing component mapping for {comp.Name} {comp.ReferenceID}");
+					Debug($"Found existing component mapping: {ElementIdentifierString(newComp)}");
 				}
 				else
 				{
 					// It breaks the original drive if I don't set breakExternalReferences to true
 					newComp = targetSlot.DuplicateComponent(comp, breakExternalReferences: true);
 					newCompMappings.Add(comp, newComp);
-					Debug($"Duplicated new component, added component mapping for: {comp.Name} {comp.ReferenceID}");
+					Debug($"Duplicated new component, added new component mapping: {ElementIdentifierString(newComp)}");
+					newSpawn = true;
 				}
-
-				Debug($"Restored component: {newComp.Name} {newComp.ReferenceID}");
 
 				if (undoable)
 				{
@@ -424,7 +617,10 @@ namespace MassComponentManipulator
 					{
 						toField.CreateUndoPoint();
 					}
-					newComp.CreateSpawnUndoPoint();
+					if (newSpawn)
+					{
+						newComp.CreateSpawnUndoPoint();
+					}
 				}
 
 				var pathToLink = GetMemberStack(link);
@@ -452,6 +648,8 @@ namespace MassComponentManipulator
 
 				if (recursive)
 				{
+					Debug("Entered recursive part.");
+
 					var allDriveData = new List<DriveData>();
 					CollectDriveData(comp, allDriveData);
 					//foreach (var member in EnumerateMembersRecursively(comp))
@@ -467,8 +665,9 @@ namespace MassComponentManipulator
 					//}
 					foreach (var driveData in allDriveData)
 					{
+						Debug($"Found driven member on source component that needs to be restored: {ElementIdentifierString(driveData.drivenMember)}");
 						var correspondingMember = FindCorrespondingMember(newComp, driveData.drivenMember, driveData.stackToDrivenMember);
-						if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: recursive))
+						if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive))
 						{
 							Debug("Restored drive.");
 						}
@@ -478,33 +677,27 @@ namespace MassComponentManipulator
 						}
 					}
 
-					ISyncMember foundMember = FindCorrespondingMember(newComp, link, pathToLink);
-
-					if (foundMember != null && foundMember.Name == link.Name && foundMember.GetType() == link.GetType())
-					{
-						var syncRef = (ISyncRef)foundMember;
-						syncRef.Target = toField;
-						return true;
-					}
+					Debug("Finished recursive part.");
 				}
-				else
+
+				//Debug($": {}");
+
+				ISyncMember foundMember = FindCorrespondingMember(newComp, link, pathToLink);
+
+				if (foundMember != null && foundMember.Name == link.Name && foundMember.GetType() == link.GetType())
 				{
-					ISyncMember foundMember = FindCorrespondingMember(newComp, link, pathToLink);
-
-					if (foundMember != null && foundMember.Name == link.Name && foundMember.GetType() == link.GetType())
-					{
-						var syncRef = (ISyncRef)foundMember;
-						syncRef.Target = toField;
-						return true;
-					}
+					var syncRef = (ISyncRef)foundMember;
+					syncRef.Target = toField;
+					return true;
 				}
+
 				return false;
 			}
 
 			ISyncMember FindCorrespondingMember(Worker root, ISyncMember memberToFind, Stack<ISyncMember> pathToMemberToFind)
 			{
 				var rootWorker = root;
-				Debug($"Finding corresponding member for source member {memberToFind.Name} of type {memberToFind.GetType().Name} on root worker {root.Name}");
+				Debug($"Finding corresponding member for source member {ElementIdentifierString(memberToFind)} of type {memberToFind.GetType().GetNiceName()} on root worker {root.Name}");
 				Debug($"Current stack: {string.Join(",", pathToMemberToFind.Select(x => x.Name))}");
 				var syncElementListType = typeof(SyncElementList<>).MakeGenericType(memberToFind.GetType());
 				while (pathToMemberToFind.Count > 0)
@@ -593,10 +786,15 @@ namespace MassComponentManipulator
 							break;
 						}
 					}
-					else
+					else if (correspondingMember != null)
 					{
 						Debug($"Found corresponding member: {correspondingMember.Name}");
 						return correspondingMember;
+					}
+					else
+					{
+						Debug("Could not find the member.");
+						break;
 					}
 				}
 				Debug("Failed. Returning null");
@@ -615,6 +813,7 @@ namespace MassComponentManipulator
 				//searchRoot.Reference.Target = WizardSlot.World.RootSlot;
 				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
 
+				restoreDrives = WizardSearchDataSlot.FindChildOrAdd("restoreDrives").GetComponentOrAttach<ValueField<bool>>();
 				restoreDrivesRecursively = WizardSearchDataSlot.FindChildOrAdd("restoreDrivesRecursively").GetComponentOrAttach<ValueField<bool>>();
 
 				VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
@@ -622,11 +821,12 @@ namespace MassComponentManipulator
 
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Hierarchy Root Slot", null, WizardUI);
-				SyncMemberEditorBuilder.Build(restoreDrivesRecursively.Value, "Restore Drives Recursively", null, WizardUI);
+				SyncMemberEditorBuilder.Build(restoreDrives.Value, "Restore Drives", null, WizardUI);
+				SyncMemberEditorBuilder.Build(restoreDrivesRecursively.Value, "Restore Drives: Recursive Mode", null, WizardUI);
 
 				WizardUI.Spacer(24f);
 
-				WizardUI.Text("<color=hero.red>WARNING: This may cause irreversible changes. Proceed with care!</color>");
+				WizardUI.Text("<color=hero.red>WARNING: Effects may not be fully undoable. Proceed with care!</color>");
 				WizardUI.Spacer(24f);
 
 				WizardUI.PushStyle();
@@ -789,7 +989,7 @@ namespace MassComponentManipulator
 
 						// copy drives
 						var sourceField = (IField)sourceMember;
-						if (sourceField.IsDriven)
+						if (restoreDrives.Value && sourceField.IsDriven)
 						{
 							Debug("Is Driven");
 							//var link = field.ActiveLink;
@@ -864,70 +1064,93 @@ namespace MassComponentManipulator
 
 						syncMember.CopyValues(sourceMember);
 
-						// Restore drives to list and bag elements
-						if (sourceMember is ISyncList sourceList)
+						if (restoreDrives.Value)
 						{
-							var allDriveData = new List<DriveData>();
-							foreach (var elem in sourceList.Elements)
+							// Restore drives to list and bag elements
+							if (sourceMember is ISyncList sourceList)
 							{
-								if (elem is IField listField)
+								Debug("Is List");
+								var allDriveData = new List<DriveData>();
+								foreach (var elem in sourceList.Elements)
 								{
-									if (listField.IsDriven)
+									if (elem is IField listField)
 									{
-										var driveData = new DriveData();
-										driveData.drivenMember = listField;
-										driveData.stackToDrivenMember = GetMemberStack(listField);
-										allDriveData.Add(driveData);
+										if (listField.IsDriven)
+										{
+											var driveData = new DriveData();
+											driveData.drivenMember = listField;
+											driveData.stackToDrivenMember = GetMemberStack(listField);
+											allDriveData.Add(driveData);
+										}
+									}
+									else if (elem is Worker listWorker)
+									{
+										CollectDriveData(listWorker, allDriveData);
 									}
 								}
-								else if (elem is Worker listWorker)
+								foreach (var driveData in allDriveData)
 								{
-									CollectDriveData(listWorker, allDriveData);
-								}
-							}
-							foreach (var driveData in allDriveData)
-							{
-								var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
-								if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
-								{
-									Debug("Restored drive.");
-								}
-								else
-								{
-									Debug("Failed to restore drive.");
-								}
-							}
-						}
-						else if (sourceMember is ISyncBag sourceBag)
-						{
-							var allDriveData = new List<DriveData>();
-							foreach (var elem in sourceBag.Values)
-							{
-								if (elem is IField listField)
-								{
-									if (listField.IsDriven)
+									Debug($"Driven field to restore: {ElementIdentifierString(driveData.drivenMember)}");
+									var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
+									if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
 									{
-										var driveData = new DriveData();
-										driveData.drivenMember = listField;
-										driveData.stackToDrivenMember = GetMemberStack(listField);
-										allDriveData.Add(driveData);
+										Debug("Restored drive.");
+									}
+									else
+									{
+										Debug("Failed to restore drive.");
 									}
 								}
-								else if (elem is Worker listWorker)
+							}
+							else if (sourceMember is ISyncBag sourceBag)
+							{
+								Debug("Is Bag");
+								var allDriveData = new List<DriveData>();
+								foreach (var elem in sourceBag.Values)
 								{
-									CollectDriveData(listWorker, allDriveData);
+									if (elem is IField listField)
+									{
+										if (listField.IsDriven)
+										{
+											var driveData = new DriveData();
+											driveData.drivenMember = listField;
+											driveData.stackToDrivenMember = GetMemberStack(listField);
+											allDriveData.Add(driveData);
+										}
+									}
+									else if (elem is Worker listWorker)
+									{
+										CollectDriveData(listWorker, allDriveData);
+									}
+								}
+								foreach (var driveData in allDriveData)
+								{
+									Debug($"Driven field to restore: {ElementIdentifierString(driveData.drivenMember)}");
+									var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
+									if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
+									{
+										Debug("Restored drive.");
+									}
+									else
+									{
+										Debug("Failed to restore drive.");
+									}
 								}
 							}
-							foreach (var driveData in allDriveData)
+							else if (sourceMember is SyncPlayback playback)
 							{
-								var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
-								if (RestoreDrive((IField)driveData.drivenMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
+								if (playback.IsDriven)
 								{
-									Debug("Restored drive.");
-								}
-								else
-								{
-									Debug("Failed to restore drive.");
+									Debug($"Driven playback to restore: {ElementIdentifierString(playback)}");
+									var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), playback, GetMemberStack(playback));
+									if (RestoreDrive((IField)syncMember, (IField)correspondingMember, newCompMappings, undoable: true, recursive: restoreDrivesRecursively.Value))
+									{
+										Debug("Restored drive.");
+									}
+									else
+									{
+										Debug("Failed to restore drive.");
+									}
 								}
 							}
 						}
