@@ -145,13 +145,23 @@ namespace MassComponentManipulator
 
 			ValueField<int> modeField;
 
+			public enum ModeEnum
+			{
+				Write,
+				DriveFromSource,
+				CopyExistingDrivesFromSource,
+				WriteOrCopyExistingDrivesFromSource
+			}
+
+			public ModeEnum Mode => (ModeEnum)Enum.GetValues(typeof(ModeEnum)).GetValue(modeField.Value);
+
 			ValueField<bool> breakExistingDrives;
 
-			bool DriveFromSource => modeField.Value == 1;
-			bool RecursiveDeepCopyDrives => modeField.Value == 2 || modeField.Value == 3;
-			bool ShouldDrive => DriveFromSource || RecursiveDeepCopyDrives;
+			bool DriveFromSource => Mode == ModeEnum.DriveFromSource;
+			bool CopyExistingDrivesFromSource => Mode == ModeEnum.CopyExistingDrivesFromSource || Mode == ModeEnum.WriteOrCopyExistingDrivesFromSource;
+			bool ShouldDrive => DriveFromSource || CopyExistingDrivesFromSource;
 
-			bool ShouldWrite => modeField.Value == 0 || modeField.Value == 3;
+			bool ShouldWrite => Mode == ModeEnum.Write || Mode == ModeEnum.WriteOrCopyExistingDrivesFromSource;
 
 			static Dictionary<Component, Component> newCompMappings = new Dictionary<Component, Component>();
 
@@ -437,7 +447,7 @@ namespace MassComponentManipulator
 			{
 				foreach (var member in EnumerateMembersRecursively(worker))
 				{
-					if (member is IField && (DriveFromSource || (RecursiveDeepCopyDrives && member.IsDriven)))
+					if (member is IField && (DriveFromSource || (CopyExistingDrivesFromSource && member.IsDriven)))
 					{
 						var driveData = new DriveData();
 						driveData.targetMember = member;
@@ -470,7 +480,7 @@ namespace MassComponentManipulator
 				}
 			}
 
-			bool RestoreDrives(SyncElement fromElement, SyncElement toElement, Dictionary<Component, Component> newCompMappings, bool undoable = false, bool recursive = false, ulong recursionDepth = 0)
+			bool CopyDrives(SyncElement fromElement, SyncElement toElement, Dictionary<Component, Component> newCompMappings, bool undoable = false, bool recursive = false, ulong recursionDepth = 0)
 			{
 				var link = fromElement.ActiveLink;
 				var comp = link.FindNearestParent<Component>();
@@ -486,7 +496,7 @@ namespace MassComponentManipulator
 
 				Debug($"Recursion depth: {recursionDepth}");
 
-				Debug($"Restoring drive for field {ElementIdentifierString(toElement)} on component {ElementIdentifierString(toFieldComponent)} on slot {ElementIdentifierString(targetSlot)}");
+				Debug($"Copying drive for field {ElementIdentifierString(toElement)} on component {ElementIdentifierString(toFieldComponent)} on slot {ElementIdentifierString(targetSlot)}");
 
 				Debug($"Source field is driven by {ElementIdentifierString(link)} of type {link.GetType().GetNiceName()} on component {ElementIdentifierString(comp)}");
 
@@ -515,15 +525,15 @@ namespace MassComponentManipulator
 						CollectDriveData(origDriveNode, allDriveData);
 						foreach (var driveData in allDriveData)
 						{
-							Debug($"Found driven member on source component that needs to be restored: {ElementIdentifierString(driveData.targetMember)}");
+							Debug($"Found driven member on source component that needs to be copied: {ElementIdentifierString(driveData.targetMember)}");
 							var correspondingMember = FindCorrespondingMember(dupedDriveNode, driveData.targetMember, driveData.stackToTargetMember);
-							if (RestoreDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive, recursionDepth: recursionDepth + 1))
+							if (CopyDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive, recursionDepth: recursionDepth + 1))
 							{
-								Debug("Restored drive.");
+								Debug("Copied drive.");
 							}
 							else
 							{
-								Debug("Failed to restore drive.");
+								Debug("Failed to copy drive.");
 							}
 							Debug($"Recursion depth: {recursionDepth}");
 						}
@@ -538,14 +548,76 @@ namespace MassComponentManipulator
 
 					if (dupedDriveNode is IDrive driveNode && driveNode.TrySetRootTarget(toElement))
 					{
-						Debug("ProtoFlux drive node restored.");
+						Debug("ProtoFlux drive node copied.");
 						return true;
 					}
-					else
+					else if (dupedDriveNode is FrooxEngine.FrooxEngine.ProtoFlux.IProtoFluxEngineProxyNode proxyNode)
 					{
-						Debug("Failed to restore ProtoFlux drive node.");
-						return false;
+						// FieldHook Node
+
+						INodeOperation origStart = null;
+						INodeOperation origStop = null;
+						if (dupedDriveNode.GetSyncMember("Target") is ISyncRef dupedTargetRef)
+						{
+							dupedTargetRef.Target = null;
+
+							Debug("In element injection");
+							// need to inject source for this probably
+							var newSlot2 = comp.Slot.Parent.AddSlot("INJECTED SOURCE for " + toElement.GetType().Name);
+							var source = (ISource)newSlot2.AttachComponent(ProtoFluxHelper.GetSourceNode(toElement.GetType()));
+							source.TrySetRootSource(toElement);
+
+							((ProtoFluxNode)dupedDriveNode).TryConnectInput(dupedTargetRef, (INodeOutput)source, false, true);
+
+							//dupedTargetRef.Target = source;
+						}
+						if (origDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef)
+						{
+							origStart = (INodeOperation)onStartRef.Target;
+							onStartRef.Target = dupedDriveNode.GetSyncMember("StartDrive");
+						}
+						if (origDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef)
+						{
+							origStop = (INodeOperation)onStopRef.Target;
+							onStopRef.Target = dupedDriveNode.GetSyncMember("StopDrive");
+						}
+						if (dupedDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef2)
+						{
+							onStartRef2.Target = origStart;
+						}
+						if (dupedDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef2)
+						{
+							onStopRef2.Target = origStop;
+						}
+						dupedDriveNode.RunInUpdates(3, () => 
+						{
+							Debug("Comp count: " + dupedDriveNode.Slot.ComponentCount.ToString());
+							var proxy2 = dupedDriveNode.Slot.GetComponent<ProtoFluxEngineProxy>();
+							if (proxy2 != null)
+							{
+								var driveMember = proxy2.GetSyncMember("Drive");
+								if (driveMember != null)
+								{
+									((ISyncRef)driveMember).Target = toElement;
+									Debug("ProtoFlux field hook node copied.");
+									return;
+								}
+								else
+								{
+									Debug("Drive member is null");
+								}
+							}
+							else
+							{
+								Debug("Proxy is null");
+							}
+							Debug("Failed to copy ProtoFlux field hook node.");
+						});
+						Debug("Will attempt to copy ProtoFlux field hook node later.");
+						return true;
 					}
+					Debug("Failed to copy ProtoFlux drive node.");
+					return false;
 				}
 
 				Debug($"Requires mapping for source component: {ElementIdentifierString(comp)}");
@@ -597,15 +669,15 @@ namespace MassComponentManipulator
 					CollectDriveData(comp, allDriveData);
 					foreach (var driveData in allDriveData)
 					{
-						Debug($"Found driven member on source component that needs to be restored: {ElementIdentifierString(driveData.targetMember)}");
+						Debug($"Found driven member on source component that needs to be copied: {ElementIdentifierString(driveData.targetMember)}");
 						var correspondingMember = FindCorrespondingMember(newComp, driveData.targetMember, driveData.stackToTargetMember);
-						if (RestoreDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive, recursionDepth: recursionDepth + 1))
+						if (CopyDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: undoable, recursive: recursive, recursionDepth: recursionDepth + 1))
 						{
-							Debug("Restored drive.");
+							Debug("Copied drive.");
 						}
 						else
 						{
-							Debug("Failed to restore drive.");
+							Debug("Failed to copy drive.");
 						}
 						Debug($"Recursion depth: {recursionDepth}");
 					}
@@ -791,11 +863,13 @@ namespace MassComponentManipulator
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Target Hierarchy Slot", null, WizardUI);
 
+				WizardUI.Spacer(24f);
+
 				WizardUI.Text("Mode:");
 				WizardUI.ValueRadio<int>("Write".AsLocaleKey(), modeField.Value, 0);
 				WizardUI.ValueRadio<int>("Drive From Source".AsLocaleKey(), modeField.Value, 1);
-				WizardUI.ValueRadio<int>("Deep Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 2);
-				WizardUI.ValueRadio<int>("Write And Deep Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 3);
+				WizardUI.ValueRadio<int>("Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 2);
+				WizardUI.ValueRadio<int>("Write Or Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 3);
 
 				SyncMemberEditorBuilder.Build(breakExistingDrives.Value, "Break Existing Drives On Target", null, WizardUI);
 
@@ -978,9 +1052,9 @@ namespace MassComponentManipulator
 								Debug("Failed to setup value copy.");
 							}
 						}
-						else if (RecursiveDeepCopyDrives && sourceField.IsDriven)
+						else if (CopyExistingDrivesFromSource && sourceField.IsDriven)
 						{
-							if (RestoreDrives((SyncElement)sourceField, (SyncElement)syncMember, newCompMappings, undoable: true, recursive: RecursiveDeepCopyDrives))
+							if (CopyDrives((SyncElement)sourceField, (SyncElement)syncMember, newCompMappings, undoable: true, recursive: CopyExistingDrivesFromSource))
 							{
 								Debug("Deep copied drives.");
 							}
@@ -1053,7 +1127,7 @@ namespace MassComponentManipulator
 								{
 									if (elem is IField listField)
 									{
-										if (DriveFromSource || (RecursiveDeepCopyDrives && listField.IsDriven))
+										if (DriveFromSource || (CopyExistingDrivesFromSource && listField.IsDriven))
 										{
 											var driveData = new DriveData();
 											driveData.targetMember = listField;
@@ -1081,9 +1155,9 @@ namespace MassComponentManipulator
 											Debug("Failed to setup value copy.");
 										}
 									}
-									else if (RecursiveDeepCopyDrives)
+									else if (CopyExistingDrivesFromSource)
 									{
-										if (RestoreDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
+										if (CopyDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
 										{
 											Debug("Deep copied drives.");
 										}
@@ -1102,7 +1176,7 @@ namespace MassComponentManipulator
 								{
 									if (elem is IField listField)
 									{
-										if (DriveFromSource || (RecursiveDeepCopyDrives && listField.IsDriven))
+										if (DriveFromSource || (CopyExistingDrivesFromSource && listField.IsDriven))
 										{
 											var driveData = new DriveData();
 											driveData.targetMember = listField;
@@ -1130,9 +1204,9 @@ namespace MassComponentManipulator
 											Debug("Failed to setup value copy.");
 										}
 									}
-									else if (RecursiveDeepCopyDrives)
+									else if (CopyExistingDrivesFromSource)
 									{
-										if (RestoreDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
+										if (CopyDrives((SyncElement)driveData.targetMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
 										{
 											Debug("Deep copied drives.");
 										}
@@ -1164,13 +1238,13 @@ namespace MassComponentManipulator
 									playbackSynchronizer.CreateSpawnUndoPoint();
 									Debug("Synchronized playbacks.");
 								}
-								else if (RecursiveDeepCopyDrives)
+								else if (CopyExistingDrivesFromSource)
 								{
 									if (sourcePlayback.IsDriven)
 									{
 										Debug($"Driven playback to restore: {ElementIdentifierString(sourcePlayback)}");
 										var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourcePlayback, GetMemberStack(sourcePlayback));
-										if (RestoreDrives((SyncElement)sourceMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
+										if (CopyDrives((SyncElement)sourceMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
 										{
 											Debug("Deep copied drives.");
 										}
@@ -1201,12 +1275,12 @@ namespace MassComponentManipulator
 				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
 				// it could be an empty undo batch if there are no matching components?
-				newCompMappings.Clear();
 				WizardSlot.World.BeginUndoBatch("Set component members");
 
 				foreach (Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) =>
 					c.GetType() == sourceComponent.Reference.Target.GetType() && c != sourceComponent.Reference.Target))
 				{
+					newCompMappings.Clear();
 					Debug(c.Name);
 					HandleWorker(c);
 				}

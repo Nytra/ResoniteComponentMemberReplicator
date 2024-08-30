@@ -48,6 +48,13 @@
     <Reference Include="FrooxEngine">
       <HintPath>G:\SteamLibrary\steamapps\common\Resonite\Resonite_Data\Managed\FrooxEngine.dll</HintPath>
     </Reference>
+    <Reference Include="ProtoFlux.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>G:\SteamLibrary\steamapps\common\Resonite\Resonite_Data\Managed\ProtoFlux.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="ProtoFluxBindings">
+      <HintPath>G:\SteamLibrary\steamapps\common\Resonite\Resonite_Data\Managed\ProtoFluxBindings.dll</HintPath>
+    </Reference>
     <Reference Include="ResoniteHotReloadLib">
       <HintPath>..\..\ResoniteHotReloadLib\bin\Release\ResoniteHotReloadLib.dll</HintPath>
     </Reference>
