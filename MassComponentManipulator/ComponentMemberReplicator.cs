@@ -13,9 +13,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace MassComponentManipulator
+namespace ComponentMemberReplicator
 {
-	public class SyncMemberManipulatorMod : ResoniteMod
+	public class ComponentMemberReplicatorMod : ResoniteMod
 	{
 		public override string Name => "ComponentMemberReplicator";
 		public override string Author => "Nytra";
@@ -70,6 +70,9 @@ namespace MassComponentManipulator
 		[AutoRegisterConfigKey]
 		static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
 
+		//[AutoRegisterConfigKey] private static ModConfigurationKey<TestEnum> Key_CheckboxFlexibleHeight2 =
+			//new ModConfigurationKey<TestEnum>("thestkey", "thestkey", () => TestEnum.One);
+
 		//[AutoRegisterConfigKey]
 		//static ModConfigurationKey<bool> Key_HandleLists = new ModConfigurationKey<bool>("Key_HandleLists", "Key_HandleLists", () => false);
 
@@ -80,7 +83,7 @@ namespace MassComponentManipulator
 			get
 			{
 				string s = "Component Member Replicator (Mod)";
-				s += " " + HotReloader.GetReloadedCountOfModType(typeof(SyncMemberManipulatorMod)).ToString();
+				s += " " + HotReloader.GetReloadedCountOfModType(typeof(ComponentMemberReplicatorMod)).ToString();
 				return s;
 			}
 		}
@@ -111,7 +114,7 @@ namespace MassComponentManipulator
 		{
 			//DateTime utcNow = DateTime.UtcNow;
 			//wizardActionString = WIZARD_TITLE + utcNow.ToString();
-			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => MassComponentManipulator.CreateWizard(slot));
+			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => ComponentMemberReplicator.CreateWizard(slot));
 		}
 
 		static void Setup()
@@ -119,11 +122,11 @@ namespace MassComponentManipulator
 			AddMenuOption();
 		}
 
-		public class MassComponentManipulator
+		public class ComponentMemberReplicator
 		{
-			public static MassComponentManipulator CreateWizard(Slot x)
+			public static ComponentMemberReplicator CreateWizard(Slot x)
 			{
-				return new MassComponentManipulator(x);
+				return new ComponentMemberReplicator(x);
 			}
 
 			Slot WizardSlot;
@@ -139,6 +142,7 @@ namespace MassComponentManipulator
 
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> sourceComponent;
+			ReferenceField<Component> targetComponent;
 
 			//ValueField<bool> restoreDrives;
 			//ValueField<bool> restoreDrivesRecursively;
@@ -171,6 +175,7 @@ namespace MassComponentManipulator
 			{
 				public ISyncMember sourceSyncMember; // the syncMember to copy from
 				public IField<bool> enabledField; // the checkbox that determines if the syncMember should be copied out to other components
+				// should add member stack here too probably
 			}
 
 			// workers with same name?
@@ -184,7 +189,7 @@ namespace MassComponentManipulator
 			const float CANVAS_WIDTH_DEFAULT = 800f; // 800f
 			const float CANVAS_HEIGHT_DEFAULT = 1200f;
 
-			MassComponentManipulator(Slot x)
+			ComponentMemberReplicator(Slot x)
 			{
 				WizardSlot = x;
 				WizardSlot.Tag = "Developer";
@@ -510,8 +515,15 @@ namespace MassComponentManipulator
 						return false;
 					}
 
-					var newSlot = comp.Slot.Parent.AddSlot(comp.Slot.Name + "_duped");
 					var origDriveNode = proxy.Node.Target.FindNearestParent<Component>();
+
+					if (!(origDriveNode is IDrive))
+					{
+						Debug("Original drive node is not IDrive, probably is FieldHook node or similar, skipping");
+						return false;
+					}
+
+					var newSlot = comp.Slot.Parent.AddSlot(comp.Slot.Name + "_duped");
 					var dupedDriveNode = newSlot.DuplicateComponent(origDriveNode, breakExternalReferences: true);
 					if (undoable)
 					{
@@ -555,66 +567,69 @@ namespace MassComponentManipulator
 					{
 						// FieldHook Node
 
-						INodeOperation origStart = null;
-						INodeOperation origStop = null;
-						if (dupedDriveNode.GetSyncMember("Target") is ISyncRef dupedTargetRef)
-						{
-							dupedTargetRef.Target = null;
+						Debug("dupedDriveNode is FieldHook node, the code shouldn't have gotten this far, skipping");
+						return false;
 
-							Debug("In element injection");
-							// need to inject source for this probably
-							var newSlot2 = comp.Slot.Parent.AddSlot("INJECTED SOURCE for " + toElement.GetType().Name);
-							var source = (ISource)newSlot2.AttachComponent(ProtoFluxHelper.GetSourceNode(toElement.GetType()));
-							source.TrySetRootSource(toElement);
+						//INodeOperation origStart = null;
+						//INodeOperation origStop = null;
+						//if (dupedDriveNode.GetSyncMember("Target") is ISyncRef dupedTargetRef)
+						//{
+						//	dupedTargetRef.Target = null;
 
-							((ProtoFluxNode)dupedDriveNode).TryConnectInput(dupedTargetRef, (INodeOutput)source, false, true);
+						//	Debug("In element injection");
+						//	// need to inject source for this probably
+						//	var newSlot2 = comp.Slot.Parent.AddSlot("INJECTED SOURCE for " + toElement.GetType().Name);
+						//	var source = (ISource)newSlot2.AttachComponent(ProtoFluxHelper.GetSourceNode(toElement.GetType()));
+						//	source.TrySetRootSource(toElement);
 
-							//dupedTargetRef.Target = source;
-						}
-						if (origDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef)
-						{
-							origStart = (INodeOperation)onStartRef.Target;
-							onStartRef.Target = dupedDriveNode.GetSyncMember("StartDrive");
-						}
-						if (origDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef)
-						{
-							origStop = (INodeOperation)onStopRef.Target;
-							onStopRef.Target = dupedDriveNode.GetSyncMember("StopDrive");
-						}
-						if (dupedDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef2)
-						{
-							onStartRef2.Target = origStart;
-						}
-						if (dupedDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef2)
-						{
-							onStopRef2.Target = origStop;
-						}
-						dupedDriveNode.RunInUpdates(3, () => 
-						{
-							Debug("Comp count: " + dupedDriveNode.Slot.ComponentCount.ToString());
-							var proxy2 = dupedDriveNode.Slot.GetComponent<ProtoFluxEngineProxy>();
-							if (proxy2 != null)
-							{
-								var driveMember = proxy2.GetSyncMember("Drive");
-								if (driveMember != null)
-								{
-									((ISyncRef)driveMember).Target = toElement;
-									Debug("ProtoFlux field hook node copied.");
-									return;
-								}
-								else
-								{
-									Debug("Drive member is null");
-								}
-							}
-							else
-							{
-								Debug("Proxy is null");
-							}
-							Debug("Failed to copy ProtoFlux field hook node.");
-						});
-						Debug("Will attempt to copy ProtoFlux field hook node later.");
-						return true;
+						//	((ProtoFluxNode)dupedDriveNode).TryConnectInput(dupedTargetRef, (INodeOutput)source, false, true);
+
+						//	//dupedTargetRef.Target = source;
+						//}
+						//if (origDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef)
+						//{
+						//	origStart = (INodeOperation)onStartRef.Target;
+						//	onStartRef.Target = dupedDriveNode.GetSyncMember("StartDrive");
+						//}
+						//if (origDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef)
+						//{
+						//	origStop = (INodeOperation)onStopRef.Target;
+						//	onStopRef.Target = dupedDriveNode.GetSyncMember("StopDrive");
+						//}
+						//if (dupedDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef2)
+						//{
+						//	onStartRef2.Target = origStart;
+						//}
+						//if (dupedDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef2)
+						//{
+						//	onStopRef2.Target = origStop;
+						//}
+						//dupedDriveNode.RunInUpdates(3, () => 
+						//{
+						//	Debug("Comp count: " + dupedDriveNode.Slot.ComponentCount.ToString());
+						//	var proxy2 = dupedDriveNode.Slot.GetComponent<ProtoFluxEngineProxy>();
+						//	if (proxy2 != null)
+						//	{
+						//		var driveMember = proxy2.GetSyncMember("Drive");
+						//		if (driveMember != null)
+						//		{
+						//			((ISyncRef)driveMember).Target = toElement;
+						//			Debug("ProtoFlux field hook node copied.");
+						//			return;
+						//		}
+						//		else
+						//		{
+						//			Debug("Drive member is null");
+						//		}
+						//	}
+						//	else
+						//	{
+						//		Debug("Proxy is null");
+						//	}
+						//	Debug("Failed to copy ProtoFlux field hook node.");
+						//});
+						//Debug("Will attempt to copy ProtoFlux field hook node later.");
+						//return true;
 					}
 					Debug("Failed to copy ProtoFlux drive node.");
 					return false;
@@ -806,11 +821,11 @@ namespace MassComponentManipulator
 				MethodInfo copyMethod;
 				if (toField is ISyncRef syncRef)
 				{
-					copyMethod = AccessTools.Method(typeof(MassComponentManipulator), "GetReferenceCopy").MakeGenericMethod(syncRef.TargetType);
+					copyMethod = AccessTools.Method(typeof(ComponentMemberReplicator), "GetReferenceCopy").MakeGenericMethod(syncRef.TargetType);
 				}
 				else
 				{
-					copyMethod = AccessTools.Method(typeof(MassComponentManipulator), "GetValueCopy").MakeGenericMethod(toField.ValueType);
+					copyMethod = AccessTools.Method(typeof(ComponentMemberReplicator), "GetValueCopy").MakeGenericMethod(toField.ValueType);
 				}
 
 				if (toField.IsDriven)
@@ -849,6 +864,7 @@ namespace MassComponentManipulator
 				searchRoot = WizardSearchDataSlot.FindChildOrAdd("searchRoot").GetComponentOrAttach<ReferenceField<Slot>>();
 				//searchRoot.Reference.Target = WizardSlot.World.RootSlot;
 				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
+				targetComponent = WizardSearchDataSlot.FindChildOrAdd("targetComponent").GetComponentOrAttach<ReferenceField<Component>>();
 
 				modeField = WizardSearchDataSlot.FindChildOrAdd("modeField").GetComponentOrAttach<ValueField<int>>();
 
@@ -861,7 +877,8 @@ namespace MassComponentManipulator
 				verticalLayout.ForceExpandHeight.Value = false;
 
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
-				SyncMemberEditorBuilder.Build(searchRoot.Reference, "Target Hierarchy Slot", null, WizardUI);
+				SyncMemberEditorBuilder.Build(targetComponent.Reference, "Target Component", null, WizardUI);
+				SyncMemberEditorBuilder.Build(searchRoot.Reference, "(or) Target Hierarchy Slot", null, WizardUI);
 
 				WizardUI.Spacer(24f);
 
@@ -970,7 +987,7 @@ namespace MassComponentManipulator
 
 						WizardUI.Spacer(24f);
 
-						var applyButton = WizardUI.Button("Copy to Hierarchy (Undoable)");
+						var applyButton = WizardUI.Button("Copy Values (Undoable)");
 						applyButton.LocalPressed += (btn, data) =>
 						{
 							Debug("Apply pressed");
@@ -986,6 +1003,37 @@ namespace MassComponentManipulator
 					}
 					UpdateCanvasSize();
 				};
+
+				void TargetChanged(IChangeable changeable)
+				{
+					var syncRef = (ISyncRef)changeable;
+					if (syncRef.Target != null)
+					{
+						ISyncRef other;
+						if (syncRef == targetComponent.Reference)
+						{
+							other = searchRoot.Reference;
+						}
+						else
+						{
+							other = targetComponent.Reference;
+						}
+
+						other.Changed -= TargetChanged;
+						try
+						{
+							other.Target = null;
+						}
+						finally
+						{
+							other.Changed += TargetChanged;
+						}
+					}
+				}
+
+				targetComponent.Reference.Changed += TargetChanged;
+				searchRoot.Reference.Changed += TargetChanged;
+
 				UpdateCanvasSize();
 			}
 
@@ -1266,26 +1314,49 @@ namespace MassComponentManipulator
 
 			private void Apply()
 			{
-				if (searchRoot.Reference.Target == null || sourceComponent.Reference.Target == null)
+				if (sourceComponent.Reference.Target == null)
 				{
-					Debug("searchRoot or sourceComponent is null!");
+					Debug("sourceComponent is null!");
+					return;
+				}
+				if (searchRoot.Reference.Target == null && targetComponent.Reference.Target == null)
+				{
+					Debug("searchRoot and targetComponent are null!");
 					return;
 				}
 
 				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
-				// it could be an empty undo batch if there are no matching components?
-				WizardSlot.World.BeginUndoBatch("Set component members");
+				var createdUndoBatch = false;
 
-				foreach (Component c in searchRoot.Reference.Target.GetComponentsInChildren((Component c) =>
-					c.GetType() == sourceComponent.Reference.Target.GetType() && c != sourceComponent.Reference.Target))
+				List<Component> componentsList;
+				if (targetComponent.Reference.Target != null)
+				{
+					componentsList = new List<Component>() { targetComponent.Reference.Target };
+				}
+				else
+				{
+					componentsList = searchRoot.Reference.Target.GetComponentsInChildren((Component c) =>
+					c.GetType() == sourceComponent.Reference.Target.GetType() && c != sourceComponent.Reference.Target);
+				}
+
+				if (componentsList.Count > 0 && workerMemberFields.Values.Any(dict => dict.Values.Any(syncMemberData => syncMemberData.sourceSyncMember is IField)))
+				{
+					WizardSlot.World.BeginUndoBatch("Set component members");
+					createdUndoBatch = true;
+				}
+
+				foreach (Component c in componentsList)
 				{
 					newCompMappings.Clear();
 					Debug(c.Name);
 					HandleWorker(c);
 				}
 
-				WizardSlot.World.EndUndoBatch();
+				if (createdUndoBatch)
+				{
+					WizardSlot.World.EndUndoBatch();
+				}
 			}
 
 			void GenerateWorkerMemberEditors(UIBuilder UI, Worker targetWorker, bool recursive = true)
