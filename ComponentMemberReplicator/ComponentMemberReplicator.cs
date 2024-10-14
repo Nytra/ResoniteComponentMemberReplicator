@@ -242,7 +242,6 @@ namespace ComponentMemberReplicator
 								yield return listMember;
 							}
 						}
-						//break;
 					}
 					else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
 					{
@@ -250,7 +249,6 @@ namespace ComponentMemberReplicator
 						{
 							yield return (ISyncMember)elem;
 						}
-						//break;
 					}
 				}
 				else if (member is ISyncBag bag)
@@ -267,7 +265,6 @@ namespace ComponentMemberReplicator
 								yield return bagMember;
 							}
 						}
-						//break;
 					}
 					else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
 					{
@@ -275,14 +272,12 @@ namespace ComponentMemberReplicator
 						{
 							yield return (ISyncMember)elem;
 						}
-						//break;
 					}
 				}
 			}
 
 			IEnumerable<ISyncMember> EnumerateMembersRecursively(Worker rootWorker)
 			{
-				//Debug($"Root worker: {rootWorker.Name}");
 				foreach (var member in rootWorker.SyncMembers)
 				{
 					yield return member;
@@ -467,7 +462,6 @@ namespace ComponentMemberReplicator
 
 				if (undoable)
 				{
-					// not sure about the correct ordering of these undo things
 					if (toElement is IField toField)
 					{
 						// If it got here then it's either not driven or we should break the drive
@@ -682,8 +676,7 @@ namespace ComponentMemberReplicator
 				VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 				verticalLayout.ForceExpandHeight.Value = false;
 
-				//WizardUI.Text("<color=gray>Target one other component OR a whole slot hierarchy.</color>").HorizontalAlign.Value = TextHorizontalAlignment.Left;
-				WizardUI.Text("<color=gray>Remember: Source and Target Components must be the same Type!</color>");//.HorizontalAlign.Value = TextHorizontalAlignment.Left;
+				WizardUI.Text("<color=gray>Remember: Source and Target Components must be the same Type!</color>");
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(targetComponent.Reference, "Target Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(searchRoot.Reference, "(or) Target Hierarchy Slot", null, WizardUI);
@@ -778,11 +771,6 @@ namespace ComponentMemberReplicator
 							Debug("Apply pressed");
 							Apply();
 						};
-
-						//var referenceEqualityDriver = WizardUI.Current.AttachComponent<ReferenceEqualityDriver<Slot>>();
-						//referenceEqualityDriver.TargetReference.Target = searchRoot.Reference;
-						//referenceEqualityDriver.Target.Target = applyButton.EnabledField;
-						//referenceEqualityDriver.Invert.Value = true;
 
 						WizardUI.Spacer(24f);
 					}
