@@ -490,8 +490,8 @@ namespace ComponentMemberReplicator
 				var link = fromElement.ActiveLink;
 				var comp = link.FindNearestParent<Component>();
 
-				var toFieldComponent = toElement.FindNearestParent<Component>();
-				var targetSlot = toFieldComponent.Slot;
+				var targetComponent = toElement.FindNearestParent<Component>();
+				var targetSlot = targetComponent.Slot;
 
 				if (!breakExistingDrives.Value && toElement.IsDriven)
 				{
@@ -501,7 +501,7 @@ namespace ComponentMemberReplicator
 
 				Debug($"Recursion depth: {recursionDepth}");
 
-				Debug($"Copying drive for field {ElementIdentifierString(toElement)} on component {ElementIdentifierString(toFieldComponent)} on slot {ElementIdentifierString(targetSlot)}");
+				Debug($"Copying drive for field {ElementIdentifierString(toElement)} on component {ElementIdentifierString(targetComponent)} on slot {ElementIdentifierString(targetSlot)}");
 
 				Debug($"Source field is driven by {ElementIdentifierString(link)} of type {link.GetType().GetNiceName()} on component {ElementIdentifierString(comp)}");
 
@@ -1322,6 +1322,18 @@ namespace ComponentMemberReplicator
 				if (searchRoot.Reference.Target == null && targetComponent.Reference.Target == null)
 				{
 					Debug("searchRoot and targetComponent are null!");
+					return;
+				}
+
+				if (sourceComponent.Reference.Target == targetComponent.Reference.Target)
+				{
+					Debug("Source component is the same reference as target component!");
+					return;
+				}
+
+				if (targetComponent.Reference.Target != null && targetComponent.Reference.Target.GetType() != sourceComponent.Reference.Target.GetType())
+				{
+					Debug("Target component is not the same type as source component!");
 					return;
 				}
 
