@@ -22,60 +22,6 @@ namespace ComponentMemberReplicator
 		public override string Version => "1.0.0";
 		public override string Link => "https://github.com/Nytra/ResoniteComponentMemberReplicator";
 
-		// initial
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_InitialMinWidth = new ModConfigurationKey<float>("Key_InitialMinWidth", "Key_InitialMinWidth", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_InitialMinHeight = new ModConfigurationKey<float>("Key_InitialMinHeight", "Key_InitialMinHeight", () => 24f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_InitialPreferredWidth = new ModConfigurationKey<float>("Key_InitialPreferredWidth", "Key_InitialPreferredWidth", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_InitialPreferredHeight = new ModConfigurationKey<float>("Key_InitialPreferredHeight", "Key_InitialPreferredHeight", () => 24f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_InitialFlexibleWidth = new ModConfigurationKey<float>("Key_InitialFlexibleWidth", "Key_InitialFlexibleWidth", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_InitialFlexibleHeight = new ModConfigurationKey<float>("Key_InitialFlexibleHeight", "Key_InitialFlexibleHeight", () => -1f);
-
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<dummy> Key_Dummy1 = new ModConfigurationKey<dummy>("Key_Dummy1", "<size=0></size>", () => new dummy());
-
-		// fields
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_FieldsMinWidth = new ModConfigurationKey<float>("Key_FieldsMinWidth", "Key_FieldsMinWidth", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_FieldsMinHeight = new ModConfigurationKey<float>("Key_FieldsMinHeight", "Key_FieldsMinHeight", () => 24f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_FieldsPreferredWidth = new ModConfigurationKey<float>("Key_FieldsPreferredWidth", "Key_FieldsPreferredWidth", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_FieldsPreferredHeight = new ModConfigurationKey<float>("Key_FieldsPreferredHeight", "Key_FieldsPreferredHeight", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_FieldsFlexibleWidth = new ModConfigurationKey<float>("Key_FieldsFlexibleWidth", "Key_FieldsFlexibleWidth", () => 1000f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_FieldsFlexibleHeight = new ModConfigurationKey<float>("Key_FieldsFlexibleHeight", "Key_FieldsFlexibleHeight", () => -1f);
-
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<dummy> Key_Dummy2 = new ModConfigurationKey<dummy>("Key_Dummy2", "<size=0></size>", () => new dummy());
-
-		// checkbox
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_CheckboxMinWidth = new ModConfigurationKey<float>("Key_CheckboxMinWidth", "Key_CheckboxMinWidth", () => 24f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_CheckboxMinHeight = new ModConfigurationKey<float>("Key_CheckboxMinHeight", "Key_CheckboxMinHeight", () => 24f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_CheckboxPreferredWidth = new ModConfigurationKey<float>("Key_CheckboxPreferredWidth", "Key_CheckboxPreferredWidth", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_CheckboxPreferredHeight = new ModConfigurationKey<float>("Key_CheckboxPreferredHeight", "Key_CheckboxPreferredHeight", () => -1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_CheckboxFlexibleWidth = new ModConfigurationKey<float>("Key_CheckboxFlexibleWidth", "Key_CheckboxFlexibleWidth", () => 1f);
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<float> Key_CheckboxFlexibleHeight = new ModConfigurationKey<float>("Key_CheckboxFlexibleHeight", "Key_CheckboxFlexibleHeight", () => -1f);
-
-		//[AutoRegisterConfigKey] private static ModConfigurationKey<TestEnum> Key_CheckboxFlexibleHeight2 =
-			//new ModConfigurationKey<TestEnum>("thestkey", "thestkey", () => TestEnum.One);
-
-		//[AutoRegisterConfigKey]
-		//static ModConfigurationKey<bool> Key_HandleLists = new ModConfigurationKey<bool>("Key_HandleLists", "Key_HandleLists", () => false);
-
 		static ModConfiguration config;
 
 		static string WIZARD_TITLE
@@ -112,8 +58,6 @@ namespace ComponentMemberReplicator
 
 		static void AddMenuOption()
 		{
-			//DateTime utcNow = DateTime.UtcNow;
-			//wizardActionString = WIZARD_TITLE + utcNow.ToString();
 			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => ComponentMemberReplicator.CreateWizard(slot));
 		}
 
@@ -131,21 +75,14 @@ namespace ComponentMemberReplicator
 
 			Slot WizardSlot;
 			Slot WizardStaticContentSlot;
-			//Slot WizardGeneratedFieldsSlot;
 			RectTransform WizardStaticContentRect;
-			//RectTransform WizardGeneratedFieldsRect;
 			Slot WizardGeneratedContentSlot;
-			//RectTransform WizardGeneratedContentRect;
 			Slot WizardSearchDataSlot;
-			//Slot WizardGeneratedFieldsDataSlot;
 			UIBuilder WizardUI;
 
 			ReferenceField<Slot> searchRoot;
 			ReferenceField<Component> sourceComponent;
 			ReferenceField<Component> targetComponent;
-
-			//ValueField<bool> restoreDrives;
-			//ValueField<bool> restoreDrivesRecursively;
 
 			ValueField<int> modeField;
 
@@ -169,8 +106,6 @@ namespace ComponentMemberReplicator
 
 			static Dictionary<Component, Component> newCompMappings = new Dictionary<Component, Component>();
 
-			//Button applyButton;
-
 			struct SyncMemberData
 			{
 				public ISyncMember sourceSyncMember; // the syncMember to copy from
@@ -180,14 +115,14 @@ namespace ComponentMemberReplicator
 
 			// workers with same name?
 			// syncMembers with same name?
-			// should check syncMemberIndex
+			// should check syncMemberIndex?
 
-			// <workerName, <memberName, SyncMemberWizardFields>>
-			// could break if there are nested workers? or workers with same name?
+			// <workerName, <memberName, SyncMemberData>>
+			// could break if there are nested workers with same name?
 			Dictionary<string, Dictionary<string, SyncMemberData>> workerMemberFields = new Dictionary<string, Dictionary<string, SyncMemberData>>();
 
 			const float CANVAS_WIDTH_DEFAULT = 800f; // 800f
-			const float CANVAS_HEIGHT_DEFAULT = 1200f;
+			const float CANVAS_HEIGHT_DEFAULT = 1224f;
 
 			ComponentMemberReplicator(Slot x)
 			{
@@ -197,7 +132,6 @@ namespace ComponentMemberReplicator
 				WizardSlot.LocalScale *= 0.0006f;
 
 				WizardSearchDataSlot = WizardSlot.AddSlot("SearchData");
-				//WizardGeneratedFieldsDataSlot = WizardSlot.AddSlot("FieldsData");
 
 				WizardUI = RadiantUI_Panel.SetupPanel(WizardSlot, WIZARD_TITLE.AsLocaleKey(), new float2(CANVAS_WIDTH_DEFAULT, CANVAS_HEIGHT_DEFAULT));
 				RadiantUI_Constants.SetupEditorStyle(WizardUI);
@@ -205,12 +139,12 @@ namespace ComponentMemberReplicator
 				WizardUI.Canvas.MarkDeveloper();
 				WizardUI.Canvas.AcceptPhysicalTouch.Value = false;
 
-				WizardUI.Style.MinWidth = -1f;//config.GetValue(Key_InitialMinWidth);
-				WizardUI.Style.MinHeight = 24f;//config.GetValue(Key_InitialMinHeight);
-				WizardUI.Style.PreferredWidth = -1f;//config.GetValue(Key_InitialPreferredWidth);
-				WizardUI.Style.PreferredHeight = 24f;//config.GetValue(Key_InitialPreferredHeight);
-				WizardUI.Style.FlexibleWidth = -1f;//config.GetValue(Key_InitialFlexibleWidth);
-				WizardUI.Style.FlexibleHeight = -1f;//config.GetValue(Key_InitialFlexibleHeight);
+				WizardUI.Style.MinWidth = -1f;
+				WizardUI.Style.MinHeight = 24f;
+				WizardUI.Style.PreferredWidth = -1f;
+				WizardUI.Style.PreferredHeight = 24f;
+				WizardUI.Style.FlexibleWidth = -1f;
+				WizardUI.Style.FlexibleHeight = -1f;
 
 				WizardSlot.PositionInFrontOfUser(float3.Backward, distance: 1f);
 
@@ -256,7 +190,6 @@ namespace ComponentMemberReplicator
 			{
 				// I couldn't get this to work right
 				// So now the canvas is constant size
-				WizardUI.Canvas.Size.Value = new float2(CANVAS_WIDTH_DEFAULT, CANVAS_HEIGHT_DEFAULT);
 				return;
 
 				//WizardSlot.RunInUpdates(30, () => 
@@ -357,68 +290,6 @@ namespace ComponentMemberReplicator
 					{
 						yield return allMember;
 					}
-					//continue;
-					////Debug(member.Name);
-					//yield return member;
-					//if (member is Worker nextWorker)
-					//{
-					//	foreach (var nextWorkerMember in EnumerateMembersRecursively(nextWorker))
-					//	{
-					//		yield return nextWorkerMember;
-					//	}
-					//}
-					//else if (member is ISyncList list)
-					//{
-					//	//Debug($"Found list: {list.Name}");
-					//	var genericArg = list.GetType().GetGenericArguments()[0];
-					//	if (typeof(Worker).IsAssignableFrom(genericArg))
-					//	{
-					//		// Need to do recursion here probably
-					//		//Debug("List of workers");
-					//		foreach (var elem in list.Elements)
-					//		{
-					//			foreach (var listMember in EnumerateMembersRecursively((Worker)elem))
-					//			{
-					//				yield return listMember;
-					//			}
-					//		}
-					//		break;
-					//	}
-					//	else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
-					//	{
-					//		foreach (var elem in list.Elements)
-					//		{
-					//			yield return (ISyncMember)elem;
-					//		}
-					//		break;
-					//	}
-					//}
-					//else if (member is ISyncBag bag)
-					//{
-					//	//Debug($"Found bag: {bag.Name}");
-					//	var genericArg = bag.GetType().GetGenericArguments()[0];
-					//	if (typeof(Worker).IsAssignableFrom(genericArg))
-					//	{
-					//		// Need to do recursion here probably
-					//		//Debug("Bag of workers");
-					//		foreach (var elem in bag.Values)
-					//		{
-					//			foreach (var bagMember in EnumerateMembersRecursively((Worker)elem))
-					//			{
-					//				yield return bagMember;
-					//			}
-					//		}
-					//		break;
-					//	}
-					//	else if (typeof(ISyncMember).IsAssignableFrom(genericArg))
-					//	{
-					//		foreach (var elem in bag.Values)
-					//		{
-					//			yield return (ISyncMember)elem;
-					//		}
-					//		break;
-					//	}
-					//}
 				}
 			}
 
@@ -501,12 +372,14 @@ namespace ComponentMemberReplicator
 
 				Debug($"Recursion depth: {recursionDepth}");
 
-				Debug($"Copying drive for field {ElementIdentifierString(toElement)} on component {ElementIdentifierString(targetComponent)} on slot {ElementIdentifierString(targetSlot)}");
+				Debug($"Copying drive for element {ElementIdentifierString(toElement)} on component {ElementIdentifierString(targetComponent)} on slot {ElementIdentifierString(targetSlot)}");
 
 				Debug($"Source field is driven by {ElementIdentifierString(link)} of type {link.GetType().GetNiceName()} on component {ElementIdentifierString(comp)}");
 
 				if (comp is ProtoFluxEngineProxy proxy) // && proxy.GetSyncMember("Drive") is ILinkRef proxyLinkRef && proxyLinkRef.Target != null && typeof(IField).IsAssignableFrom(proxyLinkRef.Target.GetType()))
 				{
+					// ProtoFlux drive node
+
 					Debug("Is ProtoFluxEngineProxy Drive");
 
 					if (proxy.Node.Target is null)
@@ -563,74 +436,13 @@ namespace ComponentMemberReplicator
 						Debug("ProtoFlux drive node copied.");
 						return true;
 					}
-					else if (dupedDriveNode is FrooxEngine.FrooxEngine.ProtoFlux.IProtoFluxEngineProxyNode proxyNode)
-					{
-						// FieldHook Node
+					//else if (dupedDriveNode is FrooxEngine.FrooxEngine.ProtoFlux.IProtoFluxEngineProxyNode proxyNode)
+					//{
+					//	// FieldHook Node
 
-						Debug("dupedDriveNode is FieldHook node, the code shouldn't have gotten this far, skipping");
-						return false;
-
-						//INodeOperation origStart = null;
-						//INodeOperation origStop = null;
-						//if (dupedDriveNode.GetSyncMember("Target") is ISyncRef dupedTargetRef)
-						//{
-						//	dupedTargetRef.Target = null;
-
-						//	Debug("In element injection");
-						//	// need to inject source for this probably
-						//	var newSlot2 = comp.Slot.Parent.AddSlot("INJECTED SOURCE for " + toElement.GetType().Name);
-						//	var source = (ISource)newSlot2.AttachComponent(ProtoFluxHelper.GetSourceNode(toElement.GetType()));
-						//	source.TrySetRootSource(toElement);
-
-						//	((ProtoFluxNode)dupedDriveNode).TryConnectInput(dupedTargetRef, (INodeOutput)source, false, true);
-
-						//	//dupedTargetRef.Target = source;
-						//}
-						//if (origDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef)
-						//{
-						//	origStart = (INodeOperation)onStartRef.Target;
-						//	onStartRef.Target = dupedDriveNode.GetSyncMember("StartDrive");
-						//}
-						//if (origDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef)
-						//{
-						//	origStop = (INodeOperation)onStopRef.Target;
-						//	onStopRef.Target = dupedDriveNode.GetSyncMember("StopDrive");
-						//}
-						//if (dupedDriveNode.GetSyncMember("OnStartDrive") is ISyncRef onStartRef2)
-						//{
-						//	onStartRef2.Target = origStart;
-						//}
-						//if (dupedDriveNode.GetSyncMember("OnStopDrive") is ISyncRef onStopRef2)
-						//{
-						//	onStopRef2.Target = origStop;
-						//}
-						//dupedDriveNode.RunInUpdates(3, () => 
-						//{
-						//	Debug("Comp count: " + dupedDriveNode.Slot.ComponentCount.ToString());
-						//	var proxy2 = dupedDriveNode.Slot.GetComponent<ProtoFluxEngineProxy>();
-						//	if (proxy2 != null)
-						//	{
-						//		var driveMember = proxy2.GetSyncMember("Drive");
-						//		if (driveMember != null)
-						//		{
-						//			((ISyncRef)driveMember).Target = toElement;
-						//			Debug("ProtoFlux field hook node copied.");
-						//			return;
-						//		}
-						//		else
-						//		{
-						//			Debug("Drive member is null");
-						//		}
-						//	}
-						//	else
-						//	{
-						//		Debug("Proxy is null");
-						//	}
-						//	Debug("Failed to copy ProtoFlux field hook node.");
-						//});
-						//Debug("Will attempt to copy ProtoFlux field hook node later.");
-						//return true;
-					}
+					//	Debug("dupedDriveNode is FieldHook node, the code shouldn't have gotten this far, skipping");
+					//	return false;
+					//}
 					Debug("Failed to copy ProtoFlux drive node.");
 					return false;
 				}
@@ -781,7 +593,6 @@ namespace ComponentMemberReplicator
 						}
 						else if (typeof(Worker).IsAssignableFrom(genericArg))
 						{
-							// Need to do recursion here probably
 							Debug("Bag of workers");
 							var bagWorkerName = pathToMemberToFind.Pop().Name;
 							foreach (var elem in bag.Values)
@@ -857,12 +668,10 @@ namespace ComponentMemberReplicator
 			{
 				WizardSearchDataSlot.DestroyChildren();
 				WizardStaticContentSlot.DestroyChildren();
-				//var rect = WizardContentSlot.GetComponent<RectTransform>();
 				WizardUI.ForceNext = WizardStaticContentRect;
 				WizardStaticContentSlot.RemoveAllComponents((Component c) => c != WizardStaticContentRect);
 
 				searchRoot = WizardSearchDataSlot.FindChildOrAdd("searchRoot").GetComponentOrAttach<ReferenceField<Slot>>();
-				//searchRoot.Reference.Target = WizardSlot.World.RootSlot;
 				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
 				targetComponent = WizardSearchDataSlot.FindChildOrAdd("targetComponent").GetComponentOrAttach<ReferenceField<Component>>();
 
@@ -870,12 +679,11 @@ namespace ComponentMemberReplicator
 
 				breakExistingDrives = WizardSearchDataSlot.FindChildOrAdd("breakExistingDrives").GetComponentOrAttach<ValueField<bool>>();
 
-				//restoreDrives = WizardSearchDataSlot.FindChildOrAdd("restoreDrives").GetComponentOrAttach<ValueField<bool>>();
-				//restoreDrivesRecursively = WizardSearchDataSlot.FindChildOrAdd("restoreDrivesRecursively").GetComponentOrAttach<ValueField<bool>>();
-
 				VerticalLayout verticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 				verticalLayout.ForceExpandHeight.Value = false;
 
+				//WizardUI.Text("<color=gray>Target one other component OR a whole slot hierarchy.</color>").HorizontalAlign.Value = TextHorizontalAlignment.Left;
+				WizardUI.Text("<color=gray>Source and Target Components must be the same Type!</color>");//.HorizontalAlign.Value = TextHorizontalAlignment.Left;
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(targetComponent.Reference, "Target Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(searchRoot.Reference, "(or) Target Hierarchy Slot", null, WizardUI);
@@ -889,9 +697,6 @@ namespace ComponentMemberReplicator
 				WizardUI.ValueRadio<int>("Write Or Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 3);
 
 				SyncMemberEditorBuilder.Build(breakExistingDrives.Value, "Break Existing Drives On Target", null, WizardUI);
-
-				//SyncMemberEditorBuilder.Build(restoreDrives.Value, "Drive From Source (ValueCopy)", null, WizardUI);
-				//SyncMemberEditorBuilder.Build(restoreDrivesRecursively.Value, "Recursive Deep Copy Drives", null, WizardUI);
 
 				WizardUI.Spacer(24f);
 
@@ -911,22 +716,15 @@ namespace ComponentMemberReplicator
 				verticalLayout2.ForceExpandHeight.Value = false;
 
 				WizardGeneratedContentSlot = WizardUI.Root;
-				//WizardGeneratedContentRect = WizardUI.CurrentRect;
 
 				WizardUI.PopStyle();
 
 				sourceComponent.Reference.Changed += (reference) =>
 				{
-					//WizardGeneratedFieldsDataSlot.DestroyChildren();
 					WizardGeneratedContentSlot.DestroyChildren();
-					//WizardUI.ForceNext = WizardGeneratedFieldsRect;
 					WizardUI.NestInto(WizardGeneratedContentSlot);
-					//WizardGeneratedFieldsSlot.RemoveAllComponents((Component c) => c != WizardGeneratedFieldsRect);
 					if (((ISyncRef)reference).Target != null)
 					{
-
-						//WizardUI.Text("Component Members");
-						//WizardUI.Spacer(24f);
 						WizardUI.Button("Select All").LocalPressed += (btn, data) =>
 						{
 							SetEnabledFields(true);
@@ -938,7 +736,7 @@ namespace ComponentMemberReplicator
 
 						WizardUI.Spacer(24f);
 
-						WizardUI.PushStyle();
+						WizardUI.PushStyle(); // 1
 
 						WizardUI.Style.MinWidth = -1f;
 						WizardUI.Style.MinHeight = -1f;
@@ -947,40 +745,27 @@ namespace ComponentMemberReplicator
 						WizardUI.Style.FlexibleWidth = -1f;
 						WizardUI.Style.FlexibleHeight = -1f;
 
-						WizardUI.PushStyle();
+						WizardUI.PushStyle(); // 2
 						WizardUI.Style.FlexibleHeight = 1f;
 						WizardUI.ScrollArea();
 						WizardUI.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
-						WizardUI.PopStyle();
+						WizardUI.PopStyle(); // 2
 
 						VerticalLayout fieldsVerticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
 						fieldsVerticalLayout.ForceExpandHeight.Value = false;
 
-						//WizardGeneratedFieldsSlot = WizardUI.Root;
-						//WizardGeneratedFieldsRect = WizardUI.CurrentRect;
-
-						WizardUI.PopStyle();
-
-						
-
-						// here!
-
-						WizardUI.PushStyle();
-
-						WizardUI.Style.MinWidth = -1f;//config.GetValue(Key_FieldsMinWidth);
-						WizardUI.Style.MinHeight = 24f;//config.GetValue(Key_FieldsMinHeight);
-						WizardUI.Style.PreferredWidth = -1f;//config.GetValue(Key_FieldsPreferredWidth);
-						WizardUI.Style.PreferredHeight = -1f;//config.GetValue(Key_FieldsPreferredHeight);
-						WizardUI.Style.FlexibleWidth = 1000f;//config.GetValue(Key_FieldsFlexibleWidth);
-						WizardUI.Style.FlexibleHeight = -1f;//config.GetValue(Key_FieldsFlexibleHeight);
+						WizardUI.Style.MinWidth = -1f;
+						WizardUI.Style.MinHeight = 24f;
+						WizardUI.Style.PreferredWidth = -1f;
+						WizardUI.Style.PreferredHeight = -1f;
+						WizardUI.Style.FlexibleWidth = 1000f;
+						WizardUI.Style.FlexibleHeight = -1f;
 
 						workerMemberFields.Clear();
 
-						//dummyComponent = WizardGeneratedFieldsDataSlot.AddSlot(searchComponent.Reference.Target.Name).AttachComponent(searchComponent.Reference.Target.GetType());
-
 						GenerateWorkerMemberEditors(WizardUI, sourceComponent.Reference.Target);
 
-						WizardUI.PopStyle();
+						WizardUI.PopStyle(); // 1
 
 						WizardUI.NestOut(); // Out of GeneratedFieldsSlot, Into ScrollArea slot
 						WizardUI.NestOut(); // Out of ScrollArea slot, Into WizardGeneratedContentSlot
@@ -1036,23 +821,6 @@ namespace ComponentMemberReplicator
 
 				UpdateCanvasSize();
 			}
-
-			//private void HandleField(Worker worker, ISyncMember syncMember)
-			//{
-			//	if (!workerMemberFields[worker.Name].ContainsKey(syncMember.Name))
-			//	{
-			//		Warn("syncMember not in dictionary. Skipping.");
-			//		return;
-			//	}
-			//	//Msg("Is field");
-			//	//IField field = ((IField)syncMember);
-			//	//SyncMemberWizardFields fieldsStruct = workerMemberFields[worker.Name][syncMember.Name];
-			//	//if (fieldsStruct.enabledField.Value == false) return;
-			//	//IField sourceMember = (IField)fieldsStruct.sourceSyncMember;
-			//	//field.CreateUndoPoint();
-
-			//	//field.BoxedValue = sourceMember.BoxedValue;
-			//}
 
 			private void HandleWorker(Worker worker)
 			{
@@ -1263,16 +1031,6 @@ namespace ComponentMemberReplicator
 											Debug("Failed to deep copy drives.");
 										}
 									}
-									//Debug($"Driven field to restore: {ElementIdentifierString(driveData.drivenMember)}");
-									//var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.drivenMember, driveData.stackToDrivenMember);
-									//if (RestoreDrives((SyncElement)driveData.drivenMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: RecursiveDeepCopyDrives))
-									//{
-									//	Debug("Restored drive.");
-									//}
-									//else
-									//{
-									//	Debug("Failed to restore drive.");
-									//}
 								}
 							}
 							else if (sourceMember is SyncPlayback sourcePlayback)
@@ -1431,13 +1189,6 @@ namespace ComponentMemberReplicator
 						}
 						continue;
 					}
-					//else if (syncMember is ISyncList && config.GetValue(Key_HandleLists))
-					//{
-					//	Debug("Is ISyncList");
-					//	Debug(syncMember.Name ?? "NULL");
-					//	Debug(syncMember.GetType().ToString() ?? "NULL");
-					//	Debug(syncMember.GetType().GetGenericArguments()[0].ToString() ?? "NULL");
-					//}
 					else if (!(syncMember is SyncElement))
 					{
 						UI.PushStyle();
@@ -1448,35 +1199,19 @@ namespace ComponentMemberReplicator
 						continue;
 					}
 
-					//Type genericTypeDefinition = null;
-					//if (syncMember.GetType().IsGenericType)
-					//{
-					//	genericTypeDefinition = syncMember.GetType().GetGenericTypeDefinition();
-					//}
-
 					FieldInfo fieldInfo = targetWorker.GetSyncMemberFieldInfo(syncMember.Name);
-
-					//Slot s = WizardGeneratedFieldsDataSlot.FindChildOrAdd(targetWorker.Name + ":" + i.ToString() + "_" + syncMember.Name);
 
 					var horizontalLayout = UI.HorizontalLayout(4f, childAlignment: Alignment.MiddleLeft);
 					horizontalLayout.ForceExpandWidth.Value = false;
-					//horizontalLayout.PaddingLeft.Value = CANVAS_WIDTH_DEFAULT / 4f;
 
 					UI.PushStyle();
 
-					//WizardUI.Style.MinWidth = config.GetValue(Key_CheckboxMinWidth);
-					//WizardUI.Style.MinHeight = config.GetValue(Key_CheckboxMinHeight);
-					//WizardUI.Style.PreferredWidth = config.GetValue(Key_CheckboxPreferredWidth);
-					//WizardUI.Style.PreferredHeight = config.GetValue(Key_CheckboxPreferredHeight);
-					//WizardUI.Style.FlexibleWidth = config.GetValue(Key_CheckboxFlexibleWidth);
-					//WizardUI.Style.FlexibleHeight = config.GetValue(Key_CheckboxFlexibleHeight);
-
-					UI.Style.MinWidth = 24f;//config.GetValue(Key_CheckboxMinWidth);
-					UI.Style.MinHeight = 24f;//config.GetValue(Key_CheckboxMinHeight);
-					UI.Style.PreferredWidth = -1f;//config.GetValue(Key_CheckboxPreferredWidth);
-					UI.Style.PreferredHeight = -1f;//config.GetValue(Key_CheckboxPreferredHeight);
-					UI.Style.FlexibleWidth = 1f;//config.GetValue(Key_CheckboxFlexibleWidth);
-					UI.Style.FlexibleHeight = -1f;//config.GetValue(Key_CheckboxFlexibleHeight);
+					UI.Style.MinWidth = 24f;
+					UI.Style.MinHeight = 24f;
+					UI.Style.PreferredWidth = -1f;
+					UI.Style.PreferredHeight = -1f;
+					UI.Style.FlexibleWidth = 1f;
+					UI.Style.FlexibleHeight = -1f;
 
 					UI.Style.TextColor = RadiantUI_Constants.Neutrals.LIGHT;
 
