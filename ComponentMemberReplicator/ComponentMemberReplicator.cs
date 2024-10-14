@@ -683,7 +683,7 @@ namespace ComponentMemberReplicator
 				verticalLayout.ForceExpandHeight.Value = false;
 
 				//WizardUI.Text("<color=gray>Target one other component OR a whole slot hierarchy.</color>").HorizontalAlign.Value = TextHorizontalAlignment.Left;
-				WizardUI.Text("<color=gray>Source and Target Components must be the same Type!</color>");//.HorizontalAlign.Value = TextHorizontalAlignment.Left;
+				WizardUI.Text("<color=gray>Remember: Source and Target Components must be the same Type!</color>");//.HorizontalAlign.Value = TextHorizontalAlignment.Left;
 				SyncMemberEditorBuilder.Build(sourceComponent.Reference, "Source Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(targetComponent.Reference, "Target Component", null, WizardUI);
 				SyncMemberEditorBuilder.Build(searchRoot.Reference, "(or) Target Hierarchy Slot", null, WizardUI);
@@ -892,7 +892,7 @@ namespace ComponentMemberReplicator
 								}
 								else if (!targetField.IsHooked)
 								{
-									Debug("Field is driven and not hooked, skipping");
+									Debug("Field is driven and not hooked, skipping because break drives is not checked");
 									continue;
 								}
 							}
@@ -928,6 +928,18 @@ namespace ComponentMemberReplicator
 
 						if (ShouldWrite)
 						{
+							if (syncMember.IsDriven)
+							{
+								if (breakExistingDrives.Value)
+								{
+									syncMember.ActiveLink.ReleaseLink(undoable: true);
+								}
+								else if (!syncMember.IsHooked)
+								{
+									Debug("SyncElement is driven and not hooked, skipping because break drives is not checked");
+									continue;
+								}
+							}
 							syncMember.CopyValues(sourceMember);
 							Debug("Values written.");
 						}
@@ -1037,6 +1049,10 @@ namespace ComponentMemberReplicator
 							{
 								if (DriveFromSource)
 								{
+									if (syncMember.IsDriven && breakExistingDrives.Value)
+									{
+										syncMember.ActiveLink.ReleaseLink(undoable: true);
+									}
 									var playbackSynchronizer = syncMember.FindNearestParent<Slot>().AttachComponent<PlaybackSynchronizer>();
 									var targetPlayback = (SyncPlayback)syncMember;
 									playbackSynchronizer.Source.Target = sourcePlayback;
@@ -1050,6 +1066,40 @@ namespace ComponentMemberReplicator
 									{
 										Debug($"Driven playback to restore: {ElementIdentifierString(sourcePlayback)}");
 										var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourcePlayback, GetMemberStack(sourcePlayback));
+										if (CopyDrives((SyncElement)sourceMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
+										{
+											Debug("Deep copied drives.");
+										}
+										else
+										{
+											Debug("Failed to deep copy drives.");
+										}
+									}
+								}
+							}
+
+							// is it possible to DriveFromSource a SyncArray? could maybe get drive data for the array... need to get references to the elements and make sure they are IFields or ISyncRefs compatible with ValueCopy/RefCopy
+							// would be possible but weird? idk, not sure they are used much anywhere
+							//else if (sourceMember is ISyncArray sourceArray)
+							//{
+
+							//}
+
+							// technically could handle SyncDictionaries but i don't think they are used much anywhere atm, although SyncFieldDictionary is a thing
+							//else if (sourceMember is ISyncDictionary sourceDict)
+							//{
+
+							//}
+
+							else
+							{
+								// Handle arbitrary SyncElement
+								if (CopyExistingDrivesFromSource)
+								{
+									if (sourceMember.IsDriven)
+									{
+										Debug($"Driven SyncElement to restore: {ElementIdentifierString(sourceMember)}");
+										var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourceMember, GetMemberStack(sourceMember));
 										if (CopyDrives((SyncElement)sourceMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
 										{
 											Debug("Deep copied drives.");
