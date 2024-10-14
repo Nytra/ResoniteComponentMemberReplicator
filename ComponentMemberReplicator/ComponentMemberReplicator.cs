@@ -20,7 +20,7 @@ namespace ComponentMemberReplicator
 		public override string Name => "ComponentMemberReplicator";
 		public override string Author => "Nytra";
 		public override string Version => "1.0.0";
-		public override string Link => "https://github.com/Nytra/ResoniteSyncMemberManipulator";
+		public override string Link => "https://github.com/Nytra/ResoniteComponentMemberReplicator";
 
 		// initial
 		//[AutoRegisterConfigKey]
