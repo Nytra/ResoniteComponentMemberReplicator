@@ -950,6 +950,21 @@ namespace ComponentMemberReplicator
 							if (sourceMember is ISyncList sourceList)
 							{
 								Debug("Is List");
+
+								if (sourceList.IsDriven && CopyExistingDrivesFromSource)
+								{
+									Debug($"Driven list to restore: {ElementIdentifierString(sourceList)}");
+									if (CopyDrives((SyncElement)sourceMember, (SyncElement)syncMember, newCompMappings, undoable: true, recursive: true))
+									{
+										Debug("Deep copied drives.");
+									}
+									else
+									{
+										Debug("Failed to deep copy drives.");
+									}
+									continue;
+								}
+
 								var allDriveData = new List<DriveData>();
 								foreach (var elem in sourceList.Elements)
 								{
@@ -999,22 +1014,37 @@ namespace ComponentMemberReplicator
 							else if (sourceMember is ISyncBag sourceBag)
 							{
 								Debug("Is Bag");
+
+								if (sourceBag.IsDriven && CopyExistingDrivesFromSource)
+								{
+									Debug($"Driven bag to restore: {ElementIdentifierString(sourceBag)}");
+									if (CopyDrives((SyncElement)sourceMember, (SyncElement)syncMember, newCompMappings, undoable: true, recursive: true))
+									{
+										Debug("Deep copied drives.");
+									}
+									else
+									{
+										Debug("Failed to deep copy drives.");
+									}
+									continue;
+								}
+
 								var allDriveData = new List<DriveData>();
 								foreach (var elem in sourceBag.Values)
 								{
-									if (elem is IField listField)
+									if (elem is IField bagField)
 									{
-										if (DriveFromSource || (CopyExistingDrivesFromSource && listField.IsDriven))
+										if (DriveFromSource || (CopyExistingDrivesFromSource && bagField.IsDriven))
 										{
 											var driveData = new DriveData();
-											driveData.targetMember = listField;
-											driveData.stackToTargetMember = GetMemberStack(listField);
+											driveData.targetMember = bagField;
+											driveData.stackToTargetMember = GetMemberStack(bagField);
 											allDriveData.Add(driveData);
 										}
 									}
-									else if (elem is Worker listWorker)
+									else if (elem is Worker bagWorker)
 									{
-										CollectDriveData(listWorker, allDriveData);
+										CollectDriveData(bagWorker, allDriveData);
 									}
 								}
 								foreach (var driveData in allDriveData)
@@ -1065,8 +1095,8 @@ namespace ComponentMemberReplicator
 									if (sourcePlayback.IsDriven)
 									{
 										Debug($"Driven playback to restore: {ElementIdentifierString(sourcePlayback)}");
-										var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourcePlayback, GetMemberStack(sourcePlayback));
-										if (CopyDrives((SyncElement)sourceMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
+										//var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourcePlayback, GetMemberStack(sourcePlayback));
+										if (CopyDrives((SyncElement)sourceMember, (SyncElement)syncMember, newCompMappings, undoable: true, recursive: true))
 										{
 											Debug("Deep copied drives.");
 										}
@@ -1099,8 +1129,8 @@ namespace ComponentMemberReplicator
 									if (sourceMember.IsDriven)
 									{
 										Debug($"Driven SyncElement to restore: {ElementIdentifierString(sourceMember)}");
-										var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourceMember, GetMemberStack(sourceMember));
-										if (CopyDrives((SyncElement)sourceMember, (SyncElement)correspondingMember, newCompMappings, undoable: true, recursive: true))
+										//var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), sourceMember, GetMemberStack(sourceMember));
+										if (CopyDrives((SyncElement)sourceMember, (SyncElement)syncMember, newCompMappings, undoable: true, recursive: true))
 										{
 											Debug("Deep copied drives.");
 										}
