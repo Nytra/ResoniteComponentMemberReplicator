@@ -90,7 +90,7 @@ namespace ComponentMemberReplicator
 				Write,
 				DriveFromSource,
 				CopyExistingDrivesFromSource,
-				WriteOrCopyExistingDrivesFromSource
+				WriteAndCopyExistingDrivesFromSource
 			}
 
 			public ModeEnum Mode => (ModeEnum)Enum.GetValues(typeof(ModeEnum)).GetValue(modeField.Value);
@@ -98,10 +98,10 @@ namespace ComponentMemberReplicator
 			ValueField<bool> breakExistingDrives;
 
 			bool DriveFromSource => Mode == ModeEnum.DriveFromSource;
-			bool CopyExistingDrivesFromSource => Mode == ModeEnum.CopyExistingDrivesFromSource || Mode == ModeEnum.WriteOrCopyExistingDrivesFromSource;
+			bool CopyExistingDrivesFromSource => Mode == ModeEnum.CopyExistingDrivesFromSource || Mode == ModeEnum.WriteAndCopyExistingDrivesFromSource;
 			bool ShouldDrive => DriveFromSource || CopyExistingDrivesFromSource;
 
-			bool ShouldWrite => Mode == ModeEnum.Write || Mode == ModeEnum.WriteOrCopyExistingDrivesFromSource;
+			bool ShouldWrite => Mode == ModeEnum.Write || Mode == ModeEnum.WriteAndCopyExistingDrivesFromSource;
 
 			static Dictionary<Component, Component> newCompMappings = new Dictionary<Component, Component>();
 
@@ -516,6 +516,15 @@ namespace ComponentMemberReplicator
 				return false;
 			}
 
+			bool BagCheck(IWorldElement from, IWorldElement to)
+			{
+				int IndexOfBagElement(IWorldElement bagElement)
+				{
+					return bagElement.FindNearestParent<ISyncBag>().Values.ToList().IndexOf(bagElement);
+				}
+				return IndexOfBagElement(from) == IndexOfBagElement(to);
+			}
+
 			ISyncMember FindCorrespondingMember(Worker root, ISyncMember memberToFind, Stack<ISyncMember> pathToMemberToFind)
 			{
 				var rootWorker = root;
@@ -568,6 +577,7 @@ namespace ComponentMemberReplicator
 							break;
 						}
 					}
+					
 					else if (correspondingMember is ISyncBag bag)
 					{
 						Debug($"Found bag: {bag.Name}");
@@ -576,9 +586,9 @@ namespace ComponentMemberReplicator
 						{
 							foreach (var elem in bag.Values)
 							{
-								if (elem is ISyncMember bagMember && bagMember.Name == memberToFind.Name)
+								if (elem is ISyncMember bagMember && BagCheck(bagMember, memberToFind))
 								{
-									Debug($"Found bag member: {bagMember.Name}");
+									Debug($"Found bag member corresponding to: {bagMember.Name}");
 									return bagMember;
 								}
 							}
@@ -586,13 +596,13 @@ namespace ComponentMemberReplicator
 						else if (typeof(Worker).IsAssignableFrom(genericArg))
 						{
 							Debug("Bag of workers");
-							var bagWorkerName = pathToMemberToFind.Pop().Name;
+							var sourceBagWorker = pathToMemberToFind.Pop();
 							foreach (var elem in bag.Values)
 							{
 								var bagWorker = (Worker)elem;
-								if (bagWorker.Name == bagWorkerName)
+								if (BagCheck(bagWorker, sourceBagWorker))
 								{
-									Debug($"Found bag worker: {bagWorker.Name}");
+									Debug($"Found bag worker corresponding to: {bagWorker.Name}");
 									var result = FindCorrespondingMember((Worker)elem, memberToFind, pathToMemberToFind);
 									if (result != null)
 									{
@@ -686,7 +696,7 @@ namespace ComponentMemberReplicator
 				WizardUI.ValueRadio<int>("Write".AsLocaleKey(), modeField.Value, 0);
 				WizardUI.ValueRadio<int>("Drive From Source".AsLocaleKey(), modeField.Value, 1);
 				WizardUI.ValueRadio<int>("Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 2);
-				WizardUI.ValueRadio<int>("Write Or Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 3);
+				WizardUI.ValueRadio<int>("Write And Copy Existing Drives From Source".AsLocaleKey(), modeField.Value, 3);
 
 				SyncMemberEditorBuilder.Build(breakExistingDrives.Value, "Break Existing Drives On Target", null, WizardUI);
 
@@ -982,6 +992,11 @@ namespace ComponentMemberReplicator
 								{
 									Debug($"Drive data member: {ElementIdentifierString(driveData.targetMember)}");
 									var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.targetMember, driveData.stackToTargetMember);
+									if (correspondingMember == null)
+									{
+										Debug("Could not find corresponding member!");
+										continue;
+									}
 									if (DriveFromSource)
 									{
 										if (SetupValueCopy((IField)driveData.targetMember, (IField)correspondingMember, undoable: true))
@@ -1046,6 +1061,11 @@ namespace ComponentMemberReplicator
 								{
 									Debug($"Drive data member: {ElementIdentifierString(driveData.targetMember)}");
 									var correspondingMember = FindCorrespondingMember(syncMember.FindNearestParent<Component>(), driveData.targetMember, driveData.stackToTargetMember);
+									if (correspondingMember == null)
+									{
+										Debug("Could not find corresponding member!");
+										continue;
+									}
 									if (DriveFromSource)
 									{
 										if (SetupValueCopy((IField)driveData.targetMember, (IField)correspondingMember, undoable: true))
