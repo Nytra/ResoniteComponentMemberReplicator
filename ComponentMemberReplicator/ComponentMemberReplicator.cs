@@ -359,7 +359,7 @@ namespace ComponentMemberReplicator
 
 				if (!breakExistingDrives.Value && toElement.IsDriven)
 				{
-					Debug("Target element is driven, skipping");
+					Debug("Target element is driven and break drives is not checked, skipping");
 					return false;
 				}
 
@@ -639,7 +639,7 @@ namespace ComponentMemberReplicator
 					}
 					else
 					{
-						Debug("Field is driven, skipping");
+						Debug("Field is driven and break drives is not checked, skipping");
 						return false;
 					}
 				}
