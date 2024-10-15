@@ -117,7 +117,7 @@ namespace ComponentMemberReplicator
 			// should check syncMemberIndex?
 
 			// <workerName, <memberName, SyncMemberData>>
-			// could break if there are nested workers with same name?
+			// could break if there are workers with the same name?
 			Dictionary<string, Dictionary<string, SyncMemberData>> workerMemberFields = new Dictionary<string, Dictionary<string, SyncMemberData>>();
 
 			const float CANVAS_WIDTH_DEFAULT = 800f; // 800f
@@ -286,10 +286,10 @@ namespace ComponentMemberReplicator
 				}
 			}
 
-			class DriveData
+			struct DriveData
 			{
 				public Stack<ISyncMember> stackToTargetMember;
-				public ISyncMember targetMember = null;
+				public ISyncMember targetMember;
 			}
 
 			Stack<ISyncMember> GetMemberStack(ISyncMember member)
@@ -920,7 +920,8 @@ namespace ComponentMemberReplicator
 
 						ISyncMember sourceMember = fieldsStruct.sourceSyncMember;
 
-						if (ShouldWrite)
+						// If the user wants to drive a list or bag from source, the target list needs to have the same number of elements, so it needs to be written over to ensure that
+						if (ShouldWrite || (DriveFromSource && (syncMember is ISyncList || syncMember is ISyncBag)))
 						{
 							if (syncMember.IsDriven)
 							{
