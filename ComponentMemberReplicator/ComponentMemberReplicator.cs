@@ -75,7 +75,6 @@ namespace ComponentMemberReplicator
 
 			Slot WizardSlot;
 			Slot WizardStaticContentSlot;
-			RectTransform WizardStaticContentRect;
 			Slot WizardGeneratedContentSlot;
 			Slot WizardSearchDataSlot;
 			UIBuilder WizardUI;
@@ -85,6 +84,8 @@ namespace ComponentMemberReplicator
 			ReferenceField<Component> targetComponent;
 
 			ValueField<int> modeField;
+
+			bool subscribedToReferenceChanges = false;
 
 			public enum ModeEnum
 			{
@@ -149,7 +150,6 @@ namespace ComponentMemberReplicator
 				WizardSlot.PositionInFrontOfUser(float3.Backward, distance: 1f);
 
 				WizardStaticContentSlot = WizardUI.Root;
-				WizardStaticContentRect = WizardUI.CurrentRect;
 
 				RegenerateWizardUI();
 			}
@@ -460,24 +460,24 @@ namespace ComponentMemberReplicator
 					newSpawn = true;
 				}
 
-				if (undoable)
+				// If it got here then it's either not driven or we should break the drive
+				if (toElement.IsDriven)
 				{
-					if (toElement is IField toField)
+					if (breakExistingDrives.Value)
 					{
-						// If it got here then it's either not driven or we should break the drive
-						if (breakExistingDrives.Value && toField.IsDriven)
-						{
-							toField.ActiveLink.ReleaseLink(undoable: true);
-						}
-						else
-						{
-							SafeFieldUndoPoint(toField);
-						}
+						toElement.ActiveLink.ReleaseLink(undoable: undoable);
 					}
-					if (newSpawn)
+				}
+				else
+				{
+					if (undoable && toElement is IField toField)
 					{
-						newComp.CreateSpawnUndoPoint();
+						SafeFieldUndoPoint(toField);
 					}
+				}
+				if (newSpawn && undoable)
+				{
+					newComp.CreateSpawnUndoPoint();
 				}
 
 				var pathToLink = GetMemberStack(link);
@@ -662,8 +662,9 @@ namespace ComponentMemberReplicator
 			{
 				WizardSearchDataSlot.DestroyChildren();
 				WizardStaticContentSlot.DestroyChildren();
-				WizardUI.ForceNext = WizardStaticContentRect;
-				WizardStaticContentSlot.RemoveAllComponents((Component c) => c != WizardStaticContentRect);
+				var staticContentRect = WizardStaticContentSlot.GetComponent<RectTransform>();
+				WizardUI.ForceNext = staticContentRect;
+				WizardStaticContentSlot.RemoveAllComponents((Component c) => c != staticContentRect);
 
 				searchRoot = WizardSearchDataSlot.FindChildOrAdd("searchRoot").GetComponentOrAttach<ReferenceField<Slot>>();
 				sourceComponent = WizardSearchDataSlot.FindChildOrAdd("sourceComponent").GetComponentOrAttach<ReferenceField<Component>>();
@@ -712,71 +713,6 @@ namespace ComponentMemberReplicator
 
 				WizardUI.PopStyle();
 
-				sourceComponent.Reference.Changed += (reference) =>
-				{
-					WizardGeneratedContentSlot.DestroyChildren();
-					WizardUI.NestInto(WizardGeneratedContentSlot);
-					if (((ISyncRef)reference).Target != null)
-					{
-						WizardUI.Button("Select All").LocalPressed += (btn, data) =>
-						{
-							SetEnabledFields(true);
-						};
-						WizardUI.Button("Deselect All").LocalPressed += (btn, data) =>
-						{
-							SetEnabledFields(false);
-						};
-
-						WizardUI.Spacer(24f);
-
-						WizardUI.PushStyle(); // 1
-
-						WizardUI.Style.MinWidth = -1f;
-						WizardUI.Style.MinHeight = -1f;
-						WizardUI.Style.PreferredWidth = -1f;
-						WizardUI.Style.PreferredHeight = -1f;
-						WizardUI.Style.FlexibleWidth = -1f;
-						WizardUI.Style.FlexibleHeight = -1f;
-
-						WizardUI.PushStyle(); // 2
-						WizardUI.Style.FlexibleHeight = 1f;
-						WizardUI.ScrollArea();
-						WizardUI.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
-						WizardUI.PopStyle(); // 2
-
-						VerticalLayout fieldsVerticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
-						fieldsVerticalLayout.ForceExpandHeight.Value = false;
-
-						WizardUI.Style.MinWidth = -1f;
-						WizardUI.Style.MinHeight = 24f;
-						WizardUI.Style.PreferredWidth = -1f;
-						WizardUI.Style.PreferredHeight = -1f;
-						WizardUI.Style.FlexibleWidth = 1000f;
-						WizardUI.Style.FlexibleHeight = -1f;
-
-						workerMemberFields.Clear();
-
-						GenerateWorkerMemberEditors(WizardUI, sourceComponent.Reference.Target);
-
-						WizardUI.PopStyle(); // 1
-
-						WizardUI.NestOut(); // Out of GeneratedFieldsSlot, Into ScrollArea slot
-						WizardUI.NestOut(); // Out of ScrollArea slot, Into WizardGeneratedContentSlot
-
-						WizardUI.Spacer(24f);
-
-						var applyButton = WizardUI.Button("Copy Values (Undoable)");
-						applyButton.LocalPressed += (btn, data) =>
-						{
-							Debug("Apply pressed");
-							Apply();
-						};
-
-						WizardUI.Spacer(24f);
-					}
-					UpdateCanvasSize();
-				};
-
 				void TargetChanged(IChangeable changeable)
 				{
 					var syncRef = (ISyncRef)changeable;
@@ -804,8 +740,80 @@ namespace ComponentMemberReplicator
 					}
 				}
 
-				targetComponent.Reference.Changed += TargetChanged;
-				searchRoot.Reference.Changed += TargetChanged;
+
+				if (!subscribedToReferenceChanges)
+				{
+					targetComponent.Reference.Changed += TargetChanged;
+					searchRoot.Reference.Changed += TargetChanged;
+
+					sourceComponent.Reference.Changed += (reference) =>
+					{
+						WizardGeneratedContentSlot.DestroyChildren();
+						WizardUI.NestInto(WizardGeneratedContentSlot);
+						if (((ISyncRef)reference).Target != null)
+						{
+							WizardUI.Button("Select All").LocalPressed += (btn, data) =>
+							{
+								SetEnabledFields(true);
+							};
+							WizardUI.Button("Deselect All").LocalPressed += (btn, data) =>
+							{
+								SetEnabledFields(false);
+							};
+
+							WizardUI.Spacer(24f);
+
+							WizardUI.PushStyle(); // 1
+
+							WizardUI.Style.MinWidth = -1f;
+							WizardUI.Style.MinHeight = -1f;
+							WizardUI.Style.PreferredWidth = -1f;
+							WizardUI.Style.PreferredHeight = -1f;
+							WizardUI.Style.FlexibleWidth = -1f;
+							WizardUI.Style.FlexibleHeight = -1f;
+
+							WizardUI.PushStyle(); // 2
+							WizardUI.Style.FlexibleHeight = 1f;
+							WizardUI.ScrollArea();
+							WizardUI.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
+							WizardUI.PopStyle(); // 2
+
+							VerticalLayout fieldsVerticalLayout = WizardUI.VerticalLayout(4f, childAlignment: Alignment.TopCenter);
+							fieldsVerticalLayout.ForceExpandHeight.Value = false;
+
+							WizardUI.Style.MinWidth = -1f;
+							WizardUI.Style.MinHeight = 24f;
+							WizardUI.Style.PreferredWidth = -1f;
+							WizardUI.Style.PreferredHeight = -1f;
+							WizardUI.Style.FlexibleWidth = 1000f;
+							WizardUI.Style.FlexibleHeight = -1f;
+
+							workerMemberFields.Clear();
+
+							GenerateWorkerMemberEditors(WizardUI, sourceComponent.Reference.Target);
+
+							WizardUI.PopStyle(); // 1
+
+							WizardUI.NestOut(); // Out of GeneratedFieldsSlot, Into ScrollArea slot
+							WizardUI.NestOut(); // Out of ScrollArea slot, Into WizardGeneratedContentSlot
+
+							WizardUI.Spacer(24f);
+
+							var applyButton = WizardUI.Button("Copy Values (Undoable)");
+							applyButton.LocalPressed += (btn, data) =>
+							{
+								Debug("Apply pressed");
+								Apply();
+							};
+
+							WizardUI.Spacer(24f);
+						}
+						UpdateCanvasSize();
+					};
+
+					subscribedToReferenceChanges = true;
+				}
+				
 
 				UpdateCanvasSize();
 			}
@@ -1067,9 +1075,17 @@ namespace ComponentMemberReplicator
 							{
 								if (DriveFromSource)
 								{
-									if (syncMember.IsDriven && breakExistingDrives.Value)
+									if (syncMember.IsDriven)
 									{
-										syncMember.ActiveLink.ReleaseLink(undoable: true);
+										if (breakExistingDrives.Value)
+										{
+											syncMember.ActiveLink.ReleaseLink(undoable: true);
+										}
+										else
+										{
+											Debug("Playback is driven and break drives is not checked, skipping...");
+											continue;
+										}
 									}
 									var playbackSynchronizer = syncMember.FindNearestParent<Slot>().AttachComponent<PlaybackSynchronizer>();
 									var targetPlayback = (SyncPlayback)syncMember;
@@ -1162,8 +1178,6 @@ namespace ComponentMemberReplicator
 					Debug("Target component is not the same type as source component!");
 					return;
 				}
-
-				//if (workerMemberFields.Count == 0 || workerMemberFields.Values.Count == 0) return;
 
 				var createdUndoBatch = false;
 
