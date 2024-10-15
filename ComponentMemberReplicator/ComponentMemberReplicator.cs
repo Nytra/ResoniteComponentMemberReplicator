@@ -34,8 +34,6 @@ namespace ComponentMemberReplicator
 			}
 		}
 
-		static string wizardActionString => WIZARD_TITLE;
-
 		public override void OnEngineInit()
 		{
 			config = GetConfiguration();
@@ -58,7 +56,7 @@ namespace ComponentMemberReplicator
 
 		static void AddMenuOption()
 		{
-			DevCreateNewForm.AddAction("Editor", wizardActionString, (slot) => ComponentMemberReplicator.CreateWizard(slot));
+			DevCreateNewForm.AddAction("Editor", WIZARD_TITLE, (slot) => ComponentMemberReplicator.CreateWizard(slot));
 		}
 
 		static void Setup()
