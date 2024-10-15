@@ -55,14 +55,10 @@
     <Reference Include="ProtoFluxBindings">
       <HintPath>G:\SteamLibrary\steamapps\common\Resonite\Resonite_Data\Managed\ProtoFluxBindings.dll</HintPath>
     </Reference>
-    <Reference Include="ResoniteHotReloadLib">
-      <HintPath>..\..\ResoniteHotReloadLib\bin\Release\ResoniteHotReloadLib.dll</HintPath>
-    </Reference>
     <Reference Include="ResoniteModLoader">
       <HintPath>G:\SteamLibrary\steamapps\common\Resonite\Libraries\ResoniteModLoader.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.ValueTuple" />
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />

@@ -6,7 +6,7 @@ using FrooxEngine.ProtoFlux.CoreNodes;
 using FrooxEngine.UIX;
 using FrooxEngine.Undo;
 using HarmonyLib;
-using ResoniteHotReloadLib;
+//using ResoniteHotReloadLib;
 using ResoniteModLoader;
 using System;
 using System.Collections.Generic;
@@ -29,7 +29,7 @@ namespace ComponentMemberReplicator
 			get
 			{
 				string s = "Component Member Replicator (Mod)";
-				s += " " + HotReloader.GetReloadedCountOfModType(typeof(ComponentMemberReplicatorMod)).ToString();
+				//s += " " + HotReloader.GetReloadedCountOfModType(typeof(ComponentMemberReplicatorMod)).ToString();
 				return s;
 			}
 		}
@@ -39,22 +39,22 @@ namespace ComponentMemberReplicator
 		public override void OnEngineInit()
 		{
 			config = GetConfiguration();
-			HotReloader.RegisterForHotReload(this);
+			//HotReloader.RegisterForHotReload(this);
 			Engine.Current.RunPostInit(Setup);
 		}
 
-		static void BeforeHotReload()
-		{
-			Msg("In BeforeHotReload!");
-			HotReloader.RemoveMenuOption("Editor", wizardActionString);
-		}
+		//static void BeforeHotReload()
+		//{
+		//	Msg("In BeforeHotReload!");
+		//	HotReloader.RemoveMenuOption("Editor", wizardActionString);
+		//}
 
-		static void OnHotReload(ResoniteMod modInstance)
-		{
-			Msg("In OnHotReload!");
-			config = modInstance.GetConfiguration();
-			Setup();
-		}
+		//static void OnHotReload(ResoniteMod modInstance)
+		//{
+		//	Msg("In OnHotReload!");
+		//	config = modInstance.GetConfiguration();
+		//	Setup();
+		//}
 
 		static void AddMenuOption()
 		{
