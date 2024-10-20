@@ -27,7 +27,7 @@ The wizard can be found in the Developer Tool's 'Create New' menu under Editors/
 ## Options
 
 - Break Existing Drives On Target
-  - If the selected member on the target component is driven, it will break the drive. This is an undoable operation.
+  - If the selected member on the target component is driven, it will break the drive so that the member can be written to or driven by something else. This is an undoable operation.
 
 ## Installation
 1. Install [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader).
