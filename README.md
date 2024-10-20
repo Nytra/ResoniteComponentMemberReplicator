@@ -8,6 +8,8 @@ Can also (re)create drives. Values can be driven directly from the source compon
 
 This is a powerful builder tool and care should be taken when using it. While most of the effects of the mod are undoable, some cannot be. It would be a good practice to make a backup of your world or item before using this.
 
+Members that are not undoable will be clearly labeled. This is anything that is not an IField, such as a list or bag.
+
 The wizard can be found in the Developer Tool's 'Create New' menu under Editors/Component Member Replicator (Mod).
 
 ## Modes
