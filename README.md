@@ -13,7 +13,7 @@ The wizard can be found in the Developer Tool's 'Create New' menu under Editors/
 ## Modes
 
 - Write
-  - Writes the selected values from the source component to the target components. Sometimes the effects of this may not be undoable if the target member is being hooked (i.e. something else is listening to its changes), it can receives further changes from an external source after the initial write happens which will not be undoable.
+  - Writes the selected values from the source component to the target components. Sometimes the effects of this may not be undoable if the target member is being hooked (i.e. something else is listening to its changes), it can receive further changes from an external source after the initial write happens which will not be undoable.
 
 - Drive From Source
   - Creates a ValueCopy or ReferenceCopy to drive the target fields. If targetting a playback, PlaybackSynchronizer will be created. If targetting a list or bag, the source list or bag will be written to the target to ensure the correct number of elements, and then all fields/playbacks will be driven.
