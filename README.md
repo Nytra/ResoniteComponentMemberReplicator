@@ -19,10 +19,10 @@ The wizard can be found in the Developer Tool's 'Create New' menu under Editors/
   - Creates a ValueCopy or ReferenceCopy to drive the target fields. If targetting a playback, PlaybackSynchronizer will be created. If targetting a list or bag, the source list or bag will be written to the target to ensure the correct number of elements, and then all fields/playbacks will be driven.
 
 - Copy Existing Drives From Source
-  - If a selected member on the source component is driven, it copies the driving components recursively over to the target component's slot and drives the target member. This will copy multiple components if they are driven in a chain.
+  - If a selected member on the source component is driven, it copies the driving components recursively over to the target component's slot and drives the target member. This will copy multiple components if they are driven in a chain. If targetting a list or bag, the existing elements in the target will not be affected if they are not driven on the source.
  
 - Write And Copy Existing Drives From Source
-  - Same as above, but if a selected member on the source component is not driven it will perform a write instead.
+  - Same as above, but if a selected member on the source component is not driven it will perform a write instead. If targetting a list or bag, all elements are affected on the target.
  
 ## Options
 
